@@ -21,16 +21,15 @@ public class PlanCategoryService {
     /**
      * 새로운 카테고리를 추가한다.
      * @param user_id
-     * @param planCategoryDTO
+     * @param categoryName
      * @return
      */
-    public ResponseEntity<Map<String, Object>> addCategory(String user_id, PlanCategoryDTO planCategoryDTO){
+    public ResponseEntity<Map<String, Object>> addCategory(String user_id, String categoryName){
         Map<String, Object> response = new HashMap<>();
 
         PlanCategory planCategory = PlanCategory.builder()
-                .id(planCategoryDTO.getId())
-                .user_id(planCategoryDTO.getUser_id())
-                .name(planCategoryDTO.getName())
+                .user_id(user_id)
+                .name(categoryName)
                 .build();
 
         try{
