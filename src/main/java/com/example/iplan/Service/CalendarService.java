@@ -64,14 +64,11 @@ public class CalendarService {
         }
 
         ScreenTimeOCRResult screenTimeOCRResult= getScreenTimeOCRRepository.findByDate(user_id, yearMonthDate);
-        Map<String, Object> PlanListResponse = planChildService.findAllPlanList(user_id, yearMonthDate);
-        List<PlanChildDTO> planChildDTOList = new ArrayList<>();
-        if (PlanListResponse.get("entity") instanceof List<?> list) {
-            if (!list.isEmpty() && list.get(0) instanceof PlanChildDTO) {
-                planChildDTOList = (List<PlanChildDTO>) list;
-            }
-        }
+        
+        // 해당 날짜에 추가한 모든 계획 정보가 담긴 response를 서비스로부터 가져옴
+        List<PlanChildDTO> planChildDTOList = planChildService.findAllPlanInTargetDate(user_id, yearMonthDate);
 
+        // 가져온 스크린타임 결과가 null이 아니고, 성공했는지 여부 체크
         boolean screenTimeSuccess = screenTimeOCRResult != null && screenTimeOCRResult.isSuccess();
 
         RewardChild rewardChild = rewardChildRepository.findRewardChildByDay(user_id, yearMonthDate);
