@@ -1,7 +1,8 @@
 package com.example.iplan.config.jwt;
 
-import com.example.iplan.auth.CustomUserDetails;
 import com.example.iplan.auth.UserRole;
+import com.example.iplan.auth.Users;
+import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -31,7 +32,7 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // CustomUserDetails 정보를 가지고 AccessToken, RefreshToken을 생성하는 메서드
+    // CustomOAuth2UserDetails 정보를 가지고 AccessToken, RefreshToken을 생성하는 메서드
     public JwtToken generateToken(Authentication authentication) {
         long now = (new Date()).getTime();
 
@@ -39,7 +40,9 @@ public class JwtTokenProvider {
         String role = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .findFirst()
-                .orElse("ROLE_CHILD"); // 기본값 (child)
+                .orElseThrow(() -> new RuntimeException("JWT 생성 실패: 사용자 권한이 없습니다."));
+
+        log.info("User: {}, Role: {}", authentication.getName(), role);
 
         // Access Token 생성
         Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRATION);
@@ -77,19 +80,28 @@ public class JwtTokenProvider {
 
         // 문자열 role을 UserRole Enum으로 변환
         String roleStr = claims.get("role", String.class);
+        log.info("User role: {}", roleStr);
         UserRole role = UserRole.fromString(roleStr);   // Enum 변환
+        log.info("User role Enum changed successfully: {}", role);
 
         // 권한 설정
         List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(role.getRole()));
 
-        // CustomUserDetails 생성
-        CustomUserDetails principal = CustomUserDetails.builder()
-                .username(claims.getSubject())
-                .password("") // 비밀번호는 필요 없음
-                .role(role)
-                .build();
+        // CustomOAuth2UserDetails 생성
+        CustomOAuth2UserDetails principal = new CustomOAuth2UserDetails(
+                Users.builder()
+                        .name("")
+                        .email(claims.getSubject())
+                        .password("")
+                        .authority(role.getRole()) // Enum에서 직접 가져옴
+                        .build()
+        );
 
-        return new UsernamePasswordAuthenticationToken(principal, "", authorities);
+        // Spring Security에서 UsernamePasswordAuthenticationToken을 생성할 때 첫 번째 매개변수는 Principal(사용자 정보) 역할을 함
+        // -> principal 대신 email을 매개변수로 넣어서 @AuthenticationPrincipal에서 바로 email 가져올 수 있도록 함!!
+        String email = claims.getSubject();
+
+        return new UsernamePasswordAuthenticationToken(email, "", authorities);
     }
 
     // JWT 유효성 검증

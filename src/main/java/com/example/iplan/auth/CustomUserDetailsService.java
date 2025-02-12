@@ -36,13 +36,13 @@ public class CustomUserDetailsService implements UserDetailsService {
      * 일반 로그인만 지원 -> CustomUserDetails 사용
      */
     // 해당하는 User 의 데이터가 존재한다면 CustomUserDetails 객체로 만들어서 return
-    private UserDetails createUserDetails(Users users) {
-        return CustomUserDetails.builder()
-                .username(users.getEmail())
-                .password(users.getPassword())  // 디비에서 암호화된 비밀번호 가져옴
-                .role(UserRole.fromString(users.getAuthority()))  // 사용자 권한 설정 -> 문자열(child, parent)을 Enum 으로 변환
-                .build();
-    }
+//    private UserDetails createUserDetails(Users users) {
+//        return CustomUserDetails.builder()
+//                .username(users.getEmail())
+//                .password(users.getPassword())  // 디비에서 암호화된 비밀번호 가져옴
+//                .role(UserRole.fromString(users.getAuthority()))  // 사용자 권한 설정 -> 문자열(child, parent)을 Enum 으로 변환
+//                .build();
+//    }
 
 }
 

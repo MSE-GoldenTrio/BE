@@ -6,6 +6,8 @@ import com.example.iplan.Domain.RewardParents;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.RewardChildRepository;
 import com.example.iplan.Repository.RewardParentsRepository;
+import com.example.iplan.auth.UserRepository;
+import com.example.iplan.auth.Users;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -26,7 +28,7 @@ public class RewardChildService {
 
     private final RewardChildRepository rewardRepository;
     private final RewardParentsRepository rewardParentsRepository;
-
+    private final UserRepository userRepository;
     /**
      * 새로운 보상을 저장하는 기능
      * @param rewardDto 저장할 보상 객체의 DTO
@@ -34,8 +36,12 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> saveReward(RewardChildDTO rewardDto) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> saveReward(RewardChildDTO rewardDto, String email) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
+
+        // 사용자 인증
+        Users user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         // 빌더 패턴을 사용하여 RewardChild 객체 생성
         RewardChild reward = RewardChild.builder()

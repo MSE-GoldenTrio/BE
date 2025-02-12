@@ -1,6 +1,5 @@
 package com.example.iplan.auth.oauth2;
 
-import com.example.iplan.auth.CustomUserDetails;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.UserRole;
 import com.example.iplan.auth.Users;
@@ -11,14 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
-import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
@@ -32,8 +28,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     @Getter
     private Users user;  // 현재 로그인한 사용자 정보 저장
-    @Getter
-    private boolean isNewUser; // 새로운 사용자 여부 확인
 
     /**
      *  OAuth2 인증 완료 후, 시큐리티가 loadUser()를 호출하여 사용자 정보 가져옴
@@ -50,8 +44,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         OAuth2UserInfo oAuth2UserInfo = OAuth2UserInfo.of(registrationId, oAuth2User.getAttributes());
         log.info("OAuth2 User Info: " + oAuth2UserInfo.getEmail());
 
-        // 사용자 저장 또는 업데이트
+        // 사용자 저장 또는 업데이트 -> user 설정
         saveOrUpdate(oAuth2UserInfo);
+        if (user == null) {
+            throw new RuntimeException("OAuth2 로그인 중 사용자 정보가 정상적으로 저장되지 않았습니다.");
+        }
 
         // JWT 토큰 생성
         JwtToken jwtToken = generateJwtToken(user);
@@ -85,11 +82,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
      * 사용자 정보를 기반으로 JWT 토큰을 생성
      */
     private JwtToken generateJwtToken(Users user) {
-        CustomUserDetails customUserDetails = CustomUserDetails.builder()
-                .username(user.getEmail())
-                .password("") // OAuth2 로그인 사용자는 비밀번호 없음
-                .role(UserRole.fromString(user.getAuthority())) // 권한 Enum 으로 변경
-                .build();
+        CustomOAuth2UserDetails customUserDetails = new CustomOAuth2UserDetails(user);
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 customUserDetails, null, customUserDetails.getAuthorities()
