@@ -76,6 +76,16 @@ public class PlanChildService {
      */
     public Map<String, Object> findAllPlanList(String user_id, @JsonFormat(pattern = "yyyy-MM-dd") String targetDate) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
+
+        List<PlanChildDTO> planDtoList = findAllPlanInTargetDate(user_id, targetDate);
+
+        response.put("success", true);
+        response.put("message", targetDate+" 의 계획 리스트를 불러오는데 성공했습니다.");
+        response.put("entity", planDtoList);
+        return response;
+    }
+
+    public List<PlanChildDTO> findAllPlanInTargetDate(String user_id, @JsonFormat(pattern = "yyy-MM-dd") String targetDate) throws ExecutionException, InterruptedException {
         List<PlanChild> planEntityList = planChildRepository.findByDate(user_id, targetDate);
 
         List<PlanChildDTO> planDtoList = new ArrayList<>();
@@ -98,10 +108,7 @@ public class PlanChildService {
             throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
-        response.put("success", true);
-        response.put("message", targetDate+" 의 계획 리스트를 불러오는데 성공했습니다.");
-        response.put("entity", planDtoList);
-        return response;
+        return planDtoList;
     }
 
     public ResponseEntity<Map<String, Object>> findByPlanID(String documentID) throws ExecutionException, InterruptedException {
