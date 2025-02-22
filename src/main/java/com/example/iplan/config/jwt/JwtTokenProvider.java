@@ -34,7 +34,13 @@ public class JwtTokenProvider {
 
     // CustomOAuth2UserDetails 정보를 가지고 AccessToken, RefreshToken을 생성하는 메서드
     public JwtToken generateToken(Authentication authentication) {
-        long now = (new Date()).getTime();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new RuntimeException("JWT 생성 실패: 인증 정보가 없습니다.");
+        }
+
+        CustomOAuth2UserDetails userDetails = (CustomOAuth2UserDetails) authentication.getPrincipal();
+
+        String nickname = userDetails.getUser().getNickname();
 
         // 사용자 권한 리스트 추출
         String role = authentication.getAuthorities().stream()
@@ -42,12 +48,14 @@ public class JwtTokenProvider {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("JWT 생성 실패: 사용자 권한이 없습니다."));
 
-        log.info("User: {}, Role: {}", authentication.getName(), role);
+        log.info("User nickname: {}, role: {}", nickname, role);
+
+        long now = (new Date()).getTime();
 
         // Access Token 생성
         Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRATION);
         String accessToken = Jwts.builder()
-                .setSubject(authentication.getName()) // username 저장
+                .setSubject(nickname)
                 .claim("role", role) // 역할 추가
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -98,10 +106,11 @@ public class JwtTokenProvider {
         );
 
         // Spring Security에서 UsernamePasswordAuthenticationToken을 생성할 때 첫 번째 매개변수는 Principal(사용자 정보) 역할을 함
-        // -> principal 대신 email을 매개변수로 넣어서 @AuthenticationPrincipal에서 바로 email 가져올 수 있도록 함!!
-        String email = claims.getSubject();
+        // -> principal 대신 nickname을 매개변수로 넣어서 @AuthenticationPrincipal에서 바로 nickname 가져올 수 있도록 함!!
+        String nickname = claims.getSubject();
 
-        return new UsernamePasswordAuthenticationToken(email, "", authorities);
+        // 기존에는 UsernamePasswordAuthenticationToken(principal, "", authorities)
+        return new UsernamePasswordAuthenticationToken(nickname, "", authorities);
     }
 
     // JWT 유효성 검증

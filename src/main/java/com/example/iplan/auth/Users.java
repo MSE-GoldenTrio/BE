@@ -20,7 +20,9 @@ public class Users {
     @Schema(description = "사용자 고유 ID", example = "abc123")
     private String id; // Firestore 문서의 ID
 
-    @NotNull
+    @Schema(description = "사용자 아이디", example = "alice", requiredMode = Schema.RequiredMode.REQUIRED)
+    private String nickname;
+
     @Schema(description = "사용자 이메일", example = "abcd@gmail.com", requiredMode = Schema.RequiredMode.REQUIRED)
     private String email;
 

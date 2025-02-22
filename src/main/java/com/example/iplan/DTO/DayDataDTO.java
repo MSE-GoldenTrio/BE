@@ -19,7 +19,7 @@ public class DayDataDTO {
     private String id;
 
     @NotNull
-    @Schema(description = "유저 ID", example = "1user2345", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "사용자 Nickname", example = "user12345", requiredMode = Schema.RequiredMode.REQUIRED)
     private String user_id;
 
     @JsonFormat(pattern = "yyyy-MM-dd")

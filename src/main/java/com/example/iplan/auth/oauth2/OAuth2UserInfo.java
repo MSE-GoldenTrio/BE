@@ -5,8 +5,11 @@ import com.example.iplan.auth.Users;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.Map;
 
+@Slf4j
 @Getter
 @Builder
 @AllArgsConstructor
@@ -29,9 +32,17 @@ public class OAuth2UserInfo {
 
     // 구글
     private static OAuth2UserInfo ofGoogle(Map<String, Object> attributes) {
+        log.info("Google User Attributes: {}", attributes);  // Google 에서 오는 데이터를 확인
+        String name = (String) attributes.get("name"); // 이름 가져오기
+        String email = (String) attributes.get("email"); // 이메일 가져오기
+
+        if (email == null || email.isEmpty()) {
+            throw new IllegalArgumentException("Google OAuth2 로그인 실패: 이메일이 없습니다.");
+        }
+
         return OAuth2UserInfo.builder()
-                .name((String) attributes.get("name"))
-                .email((String) attributes.get("email"))
+                .name(name)
+                .email(email)
                 .build();
     }
 

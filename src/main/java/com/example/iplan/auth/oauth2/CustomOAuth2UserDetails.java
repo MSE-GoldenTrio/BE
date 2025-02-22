@@ -25,11 +25,13 @@ import java.util.Map;
 public class CustomOAuth2UserDetails implements OAuth2User, UserDetails {
     private Users user;
     private Map<String, Object> attributes;
+    private String jwtToken;
 
     // 일반 로그인 사용자를 위한 생성자 (OAuth2 attributes 없이 생성)
     public CustomOAuth2UserDetails(Users user) {
         this.user = user;
         this.attributes = null; // 일반 로그인 사용자는 attributes 없음
+        this.jwtToken = null;
     }
 
     // Spring Security의 권한 정보 반환
@@ -45,11 +47,12 @@ public class CustomOAuth2UserDetails implements OAuth2User, UserDetails {
         return user.getPassword();
     }
 
-     // Spring Security에서 사용할 사용자 이름 (이메일)
-    @Override
-    public String getUsername() {
-        return user.getEmail();
-    }
+     // Spring Security 에서 사용할 사용자 이름 (닉네임)
+     // Spring Security 의 인증 과정에서 사용자 식별을 위해 호출
+     @Override
+     public String getUsername() {
+         return user.getNickname();
+     }
 
     // OAuth2 로그인 시 제공된 사용자 속성
     @Override
@@ -57,10 +60,11 @@ public class CustomOAuth2UserDetails implements OAuth2User, UserDetails {
         return attributes;
     }
 
-    // OAuth2User에서 요구하는 getName() (필요 없지만 구현 필요)
+    // OAuth2User 에서 요구하는 getName()
+    // OAuth2 로그인 시 사용자의 고유 식별자를 반환할 때 호출됨
     @Override
     public String getName() {
-        return user.getEmail();
+        return user.getNickname();
     }
 
     // 계정 만료 여부

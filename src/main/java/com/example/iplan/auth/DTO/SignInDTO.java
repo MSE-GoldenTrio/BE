@@ -10,7 +10,7 @@ import lombok.ToString;
 @ToString
 @NoArgsConstructor
 public class SignInDTO {
-    private String email;
+    private String nickname;
     private String password;
     private String fcmToken;    // 사용자가 직접 입력 x
 }

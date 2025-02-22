@@ -23,7 +23,7 @@ public class UserController {
     @Operation(summary = "회원가입")
     public ResponseEntity<String> signUp(@RequestBody SignUpDTO signUpDto){
         try {
-            String result = userService.signUp(signUpDto.getEmail(), signUpDto.getPassword(), signUpDto.getName(), signUpDto.getAuthority());
+            String result = userService.signUp(signUpDto.getNickname(), signUpDto.getPassword(), signUpDto.getEmail(), signUpDto.getName(), signUpDto.getAuthority());
             return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -33,13 +33,15 @@ public class UserController {
     @PostMapping("/login")
     @Operation(summary = "로그인")
     public JwtToken signIn(@RequestBody SignInDTO signInDto) {
-        String email = signInDto.getEmail();
+        String nickname = signInDto.getNickname();
         String password = signInDto.getPassword();
         String fcmToken = signInDto.getFcmToken();
-        log.info("Login request: email = {}, password = {}, fcmToken = {}", email, password, fcmToken);
+        log.info("Login request: nickname = {}, password = {}, fcmToken = {}", nickname, password, fcmToken);
 
-        JwtToken jwtToken = userService.signIn(email, password, fcmToken);
+        JwtToken jwtToken = userService.signIn(nickname, password, fcmToken);
         log.info("JwtToken accessToken = {}, refreshToken = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
         return jwtToken;
     }
+
+
 }

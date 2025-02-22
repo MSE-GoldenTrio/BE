@@ -13,7 +13,7 @@ public class RewardParentsDTO {
 
     private String plan_id; // 연관된 계획의 ID
 
-    private String user_id; // 부모님의 사용자 ID
+    private String user_id; // 부모님의 사용자 ID(닉네임)
 
     private String comment; // 부모님의 코멘트
 

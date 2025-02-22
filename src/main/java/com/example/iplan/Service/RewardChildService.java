@@ -36,11 +36,11 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> saveReward(RewardChildDTO rewardDto, String email) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> saveReward(RewardChildDTO rewardDto, String nickname) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
 
         // 사용자 인증
-        Users user = userRepository.findByEmail(email)
+        Users user = userRepository.findByNickname(nickname)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         // 빌더 패턴을 사용하여 RewardChild 객체 생성

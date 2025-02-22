@@ -20,7 +20,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     // UserService 의 로그인 과정에서 호출 됨 -> 디비에서 해당 이메일을 가진 사용자 조회
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userRepository.findByEmail(username)
+        return userRepository.findByNickname(username)
                 .map(CustomOAuth2UserDetails::new) // CustomOAuth2UserDetails 사용
                 .orElseThrow(() -> new UsernameNotFoundException("해당하는 회원을 찾을 수 없습니다."));
 

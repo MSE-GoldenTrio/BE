@@ -12,7 +12,7 @@ public class RewardChildDTO {
 
     private String id; // Firestore 문서의 ID
 
-    private String user_id; // 아이의 고유 ID
+    private String user_id; // 아이의 고유 닉네임
 
     private String content; // 보상의 내용
 
@@ -33,6 +33,4 @@ public class RewardChildDTO {
     private boolean rewarded; // 보상이 지급되었는지 여부
 
     private boolean success; // 보상이 지급 or 보류
-
-//    private boolean is_rewarded; // 보상이 지급되었는지 여부
 }

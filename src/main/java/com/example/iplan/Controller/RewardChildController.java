@@ -49,10 +49,10 @@ public class RewardChildController {
             }))
     @PostMapping
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> addReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal String email) throws ExecutionException, InterruptedException {
-        log.info("Received RewardChildDTO: {}, AuthenticationPrincipal email: {}", rewardDto, email);
+    public ResponseEntity<Map<String, Object>> saveReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
+        log.info("Received RewardChildDTO: {}, AuthenticationPrincipal email: {}", rewardDto, nickname);
 
-        return rewardChildService.saveReward(rewardDto, email);
+        return rewardChildService.saveReward(rewardDto, nickname);
     }
 
     /**

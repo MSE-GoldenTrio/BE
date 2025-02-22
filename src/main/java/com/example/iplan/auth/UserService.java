@@ -23,16 +23,22 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     // 회원가입
-    public String signUp(String email, String password, String name, String role) {
+    public String signUp(String nickname, String password, String email, String name, String role) {
         try {
-            // 1. 이메일 중복 확인
-            if (userRepository.findByEmail(email).isPresent()) {
-                throw new IllegalArgumentException("User already exists.");
+            // 1. 아이디 중복 확인
+            if (nickname != null && userRepository.findByNickname(nickname).isPresent()) {
+                throw new IllegalArgumentException("Nickname already exists.");
+            }
+
+            // 2. 이메일 중복 확인
+            if (email != null && userRepository.findByEmail(email).isPresent()) {
+                throw new IllegalArgumentException("User email already exists.");
             }
 
             // 2. Users 객체 생성
             Users user = Users.builder()
-                    .email(email)
+                    .nickname(nickname)
+                    .email(email)   // 기본값 null
                     .password(passwordEncoder.encode(password)) // 비밀번호 암호화
                     .name(name)
                     .authority(role)    // child, parent
@@ -47,9 +53,9 @@ public class UserService {
     }
 
     // 로그인
-    public JwtToken signIn(String email, String password, String fcmToken) {
+    public JwtToken signIn(String nickname, String password, String fcmToken) {
         // 1. 사용자의 입력값으로 UsernamePasswordAuthenticationToken 생성 -> 비밀번호 검증을 위해 사용됨
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(email, password);
+        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(nickname, password);
         log.info("Passed signIn 1");
 
         // AuthenticationManager 가 로그인 요청을 처리 (여기서 사용자 인증과 비밀번호 검증이 이루어짐)
@@ -67,12 +73,12 @@ public class UserService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         // 인증된 사용자 조회
-        Users user = userRepository.findByEmail(email)
+        Users user = userRepository.findByNickname(nickname)
                 .orElseThrow(() -> new IllegalArgumentException("User not found."));
 
         // 4. fcmToken 디비에 업데이트
         user.setFcmToken(fcmToken);
-        log.info("Updated fcmToken for user: {}", email);
+        log.info("Updated fcmToken for user: {}", nickname);
 
         // 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
         JwtToken jwtToken = jwtTokenProvider.generateToken(authentication);
