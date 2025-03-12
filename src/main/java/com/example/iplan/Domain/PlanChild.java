@@ -50,6 +50,14 @@ public class PlanChild {
     @Schema(description = "계획이 추가된 날짜의 일", example = "22", requiredMode = Schema.RequiredMode.REQUIRED)
     private String post_date;
 
+    @JsonFormat(pattern = "HH:mm")
+    @Schema(description = "계획 시작 시간", example = "14:00")
+    private String plan_start_time;
+
+    @JsonFormat(pattern = "HH:mm")
+    @Schema(description = "계획 마감 시간", example = "17:25")
+    private String plan_end_time;
+
     @Schema(description = "계획에 대한 부연 설명 혹은 중요한 점 메모", example = "10p 참고하면서 하기")
     private String memo;
 

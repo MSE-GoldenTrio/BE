@@ -47,6 +47,8 @@ public class PlanChildService {
                 .post_year(dateArr[0])
                 .post_month(dateArr[1])
                 .post_date(dateArr[2])
+                .plan_start_time(planPostDto.getPlan_start_time())
+                .plan_end_time(planPostDto.getPlan_end_time())
                 .is_completed(planPostDto.is_completed())
                 .build();
 
@@ -93,11 +95,14 @@ public class PlanChildService {
         try{
             if(!planEntityList.isEmpty()){
                 for(PlanChild plan : planEntityList){
+                    String start_time = plan.getPlan_start_time() != null && !plan.getPlan_start_time().isEmpty()
+                            ? plan.getPlan_start_time() : "";
                     PlanChildDTO planDto = PlanChildDTO.builder()
                             .id(plan.getId())
                             .user_id(plan.getUser_id())
                             .title(plan.getTitle())
                             .post_date(targetDate)
+                            .plan_start_time(start_time)
                             .is_completed(plan.is_completed())
                             .build();
 
@@ -151,6 +156,8 @@ public class PlanChildService {
         updateIfNotNull(planChildDTO.getTitle(), originalPlan::setTitle);
         updateIfNotNull(planChildDTO.getMemo(), originalPlan::setMemo);
         updateIfNotNull(planChildDTO.getCategory_id(), originalPlan::setCategory_id);
+        updateIfNotNull(planChildDTO.getPlan_start_time(), originalPlan::setPlan_start_time);
+        updateIfNotNull(planChildDTO.getPlan_end_time(), originalPlan::setPlan_end_time);
         updateIfNotNull(planChildDTO.isAlarm(), originalPlan::setAlarm);
         updateIfNotNull(planChildDTO.is_completed(), originalPlan::set_completed);
 
