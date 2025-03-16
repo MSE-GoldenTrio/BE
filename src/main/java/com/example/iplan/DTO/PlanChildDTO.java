@@ -43,6 +43,14 @@ public class PlanChildDTO {
     @NotNull
     private String post_date;
 
+    @JsonFormat(pattern = "HH:mm")
+    @Schema(description = "계획 시작 시간", example = "14:00")
+    private String plan_start_time;
+
+    @JsonFormat(pattern = "HH:mm")
+    @Schema(description = "계획 마감 시간", example = "17:25")
+    private String plan_end_time;
+
     @Schema(description = "계획 달성 여부", example = "false", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull
     private boolean is_completed;
