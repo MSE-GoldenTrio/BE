@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 @RestController
 @RequiredArgsConstructor
 @Slf4j
@@ -23,7 +25,14 @@ public class UserController {
     @Operation(summary = "회원가입")
     public ResponseEntity<String> signUp(@RequestBody SignUpDTO signUpDto){
         try {
-            String result = userService.signUp(signUpDto.getNickname(), signUpDto.getPassword(), signUpDto.getEmail(), signUpDto.getName(), signUpDto.getAuthority());
+            String nickname = signUpDto.getNickname();
+            String password = signUpDto.getPassword();
+            String name = signUpDto.getName();
+            String email = signUpDto.getEmail();
+            String authority = signUpDto.getAuthority();
+            log.info("Login request: nickname = {}, password = {}, name = {}, email = {}, authority: {}", nickname, password, name, email, authority);
+
+            String result = userService.signUp(nickname, password, name, email, authority);
             return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -43,5 +52,14 @@ public class UserController {
         return jwtToken;
     }
 
+
+    @PostMapping("/check-nickname")
+    @Operation(summary = "중복 아이디 체크")
+    public ResponseEntity<Map<String, Boolean>> checkNickname(@RequestBody Map<String, String> request) {
+        String nickname = request.get("nickname");
+        log.info("Request nickname = {}", nickname);
+        boolean isAvailable = userService.isNicknameAvailable(nickname);
+        return ResponseEntity.ok(Map.of("available", isAvailable));
+    }
 
 }
