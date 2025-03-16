@@ -50,8 +50,7 @@ public class SecurityConfig{
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
                                 // 로그인, 회원가입, 소셜 로그인은 인증 없이 허용
-                                .requestMatchers(new AntPathRequestMatcher("/api/auth/login")).permitAll()
-                                .requestMatchers(new AntPathRequestMatcher("/api/auth/register")).permitAll()
+                                .requestMatchers(new AntPathRequestMatcher("/api/auth/**")).permitAll()
                                 .requestMatchers(new AntPathRequestMatcher("/oauth2/**")).permitAll()
 
                                 // Swagger 및 API 문서 접근 허용
