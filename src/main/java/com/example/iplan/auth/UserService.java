@@ -26,12 +26,14 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     // 회원가입
-    public String signUp(String nickname, String password, String name, String email, String role) {
+    public String signUp(String nickname, String password, String name, String email, String roleStr) {
         try {
             // 1. 아이디 중복 확인
             if (nickname != null && userRepository.findByNickname(nickname).isPresent()) {
                 throw new IllegalArgumentException("Nickname already exists.");
             }
+
+            UserRole role = UserRole.fromString(roleStr);   // Enum 변환
 
             // 2. Users 객체 생성
             Users user = Users.builder()
