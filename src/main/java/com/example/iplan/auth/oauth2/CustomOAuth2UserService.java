@@ -95,7 +95,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         .name(oAuth2UserInfo.getName())
                         .nickname(randomNickname) // 랜덤 닉네임 할당
                         .password("")
-                        .authority(UserRole.CHILD.name())
+                        .authority(UserRole.CHILD) // UserRole 타입으로 직접 전달
                         .build();
                 userRepository.save(user);
 
