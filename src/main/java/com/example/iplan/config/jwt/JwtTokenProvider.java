@@ -42,11 +42,15 @@ public class JwtTokenProvider {
 
         String nickname = userDetails.getUser().getNickname();
 
-        // 사용자 권한 리스트 추출
-        String role = authentication.getAuthorities().stream()
+        // 사용자 권한 리스트 추출 (ROLE_CHILD, ROLE_PARENT → CHILD, PARENT 변환)
+        // authentication.getAuthorities()에서 GrantedAuthority의 getAuthority()를 호출하여 문자열(ROLE_CHILD, ROLE_PARENT)을 가져옴
+        String roleString = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("JWT 생성 실패: 사용자 권한이 없습니다."));
+
+        // 이때, 문자열이 아니라 Enum 값(CHILD, PARENT)을 저장하려면 UserRole.fromString()을 사용해 변환
+        UserRole role = UserRole.fromString(roleString); // 문자열을 Enum(UserRole)로 변환
 
         log.info("User nickname: {}, role: {}", nickname, role);
 
@@ -56,7 +60,7 @@ public class JwtTokenProvider {
         Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRATION);
         String accessToken = Jwts.builder()
                 .setSubject(nickname)
-                .claim("role", role) // 역할 추가
+                .claim("role", role.name()) // Enum 값 저장 (CHILD, PARENT)
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
@@ -79,17 +83,18 @@ public class JwtTokenProvider {
     public Authentication getAuthentication(String accessToken) {
         // Jwt 토큰 복호화
         Claims claims = parseClaims(accessToken);
-        log.info("[JwtTokenProvider getAuthentication] claim.getSubject: {}", claims.getSubject());
+        log.info("[JwtTokenProvider getAuthentication]");
+        log.info("claim.getSubject is 'Nickname' = {}", claims.getSubject());
 
         // role 정보가 없는 경우 예외 처리
         if (claims.get("role") == null) {
             throw new RuntimeException("JWT에 role 정보가 없습니다.");
         }
 
-        // 문자열 role을 UserRole Enum으로 변환
+        // claims.get("role", String.class)에서 가져오는 값이 이미 **Enum 값(CHILD, PARENT)**이므로
         String roleStr = claims.get("role", String.class);
         log.info("User role: {}", roleStr);
-        UserRole role = UserRole.fromString(roleStr);   // Enum 변환
+        UserRole role = UserRole.valueOf(roleStr);  // 이미 문자열이 Enum 값과 같으므로 UserRole fromString 변환 필요 없음
         log.info("User role Enum changed successfully: {}", role);
 
         // 권한 설정
@@ -99,9 +104,10 @@ public class JwtTokenProvider {
         CustomOAuth2UserDetails principal = new CustomOAuth2UserDetails(
                 Users.builder()
                         .name("")
-                        .email(claims.getSubject())
+                        .email("")
+                        .nickname(claims.getSubject())  // 토큰에서 추출한..
                         .password("")
-                        .authority(role.getRole()) // Enum에서 직접 가져옴
+                        .authority(role)    // Enum 값 그대로 사용
                         .build()
         );
 
