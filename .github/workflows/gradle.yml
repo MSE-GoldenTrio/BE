@@ -9,10 +9,6 @@ name: Java CI with Gradle
 
 # 동작 조건 설정: main, develop 브랜치에 pull request이 merge될 경우 동작
 on:
-  pull_request:
-    types:
-      - closed
-    branches: [ "main", "develop"]
   push:
     branches: [ "main", "develop" ]
 
