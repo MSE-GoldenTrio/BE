@@ -30,9 +30,10 @@ public class UserController {
             String name = signUpDto.getName();
             String email = signUpDto.getEmail();
             String authority = signUpDto.getAuthority();
-            log.info("Login request: nickname = {}, password = {}, name = {}, email = {}, authority: {}", nickname, password, name, email, authority);
+            log.info("Register request: nickname = {}, password = {}, name = {}, email = {}, authority: {}", nickname, password, name, email, authority);
 
             String result = userService.signUp(nickname, password, name, email, authority);
+            log.info("Register result: {}", result);
             return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
