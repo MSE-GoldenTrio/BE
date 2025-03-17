@@ -36,7 +36,7 @@ public class Users {
 
     @NotNull
     @Schema(description = "사용자 권한(아이/부모)", example = "CHILD", requiredMode = Schema.RequiredMode.REQUIRED)
-    private String authority;
+    private UserRole authority;
 
     @Schema(description = "사용자와 연동된 id", example = "abc456")
     private String linked_id = null;
