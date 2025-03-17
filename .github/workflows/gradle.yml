@@ -49,7 +49,7 @@ jobs:
           mkdir ./src/main/resources || true
           cd ./src/main/resources
           rm -rf ./application-oauth2.yml || true
-          echo "${{ secrets.APPLICATION_OAUTH2_YML }}" | base64 --decode > ./application-oauth.yml
+          echo "${{ secrets.APPLICATION_OAUTH2_YML }}" | base64 --decode > ./application-oauth2.yml
         shell: bash
 
       # gradlew 권한 문제로 인한 권한 부여

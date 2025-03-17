@@ -8,12 +8,16 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.cloud.FirestoreClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 
 @Configuration
 public class FirebaseConfig {
+
+    @Value("${firebase.config.path}") // application.yml 값 읽기
+    private String firebaseConfigPath;
 
     /**
      * Firebase 서비스 전반의 기본적인 초기화 역할을 한다.
@@ -24,16 +28,16 @@ public class FirebaseConfig {
     @Bean
     public FirebaseApp firebaseApp() throws IOException {
         String configPath;
-    
-        // Docker 환경에서는 환경 변수에서 경로를 읽고, 로컬 환경에서는 프로퍼티에서 읽는다.
+
+        // Docker 환경에서는 환경 변수에서 경로를 읽고, 로컬 환경에서는 yml에서 읽는다.
         if (System.getenv("FIREBASE_CONFIG_PATH") != null) {
             // Docker 환경
             System.out.println("도커 환경: "+ System.getenv("FIREBASE_CONFIG_PATH"));
             configPath = System.getenv("FIREBASE_CONFIG_PATH");
         } else {
-            // 로컬 환경
-            System.out.println("환경변수 null임: "+ System.getenv("FIREBASE_CONFIG_PATH"));
-            configPath = "src/main/resources/iplan-firebase.json";  // 로컬 파일 경로
+            // 로컬 환경 (application.yml의 값 사용)
+            System.out.println("환경변수 null임: "+ firebaseConfigPath);
+            configPath = firebaseConfigPath;
         }
         
         if (configPath == null) {
