@@ -38,7 +38,9 @@ public class CustomOAuth2UserDetails implements OAuth2User, UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.singletonList(
-                new SimpleGrantedAuthority(user.getAuthority())); // 사용자 권한
+                // SimpleGrantedAuthority는 Spring Security에서 사용자의 권한을 나타내는 객체이며, 생성자에서 문자열(String)을 요구
+                // user.getAuthority()는 UserRole 타입이므로, getRole()을 호출하여 ROLE_CHILD 또는 ROLE_PARENT와 같은 문자열 값을 가져옴
+                new SimpleGrantedAuthority(user.getAuthority().getRole())); // 사용자 권한
     }
 
     // 사용자 비밀번호 (OAuth2 로그인 시 null)
