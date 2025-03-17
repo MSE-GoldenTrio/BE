@@ -74,7 +74,7 @@ public class OAuth2UserInfo {
                 .name(name)
                 .email(email)
                 .password("") // OAuth2 로그인 사용자는 비밀번호 없음
-                .authority(UserRole.CHILD.name()) // 기본 권한 설정
+                .authority(UserRole.CHILD) // 기본 권한 설정
                 .build();
     }
 
