@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +26,7 @@ import java.util.concurrent.ExecutionException;
  * 특정 날짜의 단일 계획들에 대한 컨트롤러
  */
 @Tag(name = "Plan CRUD", description = "아이 화면에서 계획을 추가하고, 확인하고, 수정하고, 삭제합니다.")
+@Slf4j
 @RequiredArgsConstructor
 @Controller
 @RequestMapping("/plan")
@@ -48,7 +50,7 @@ public class PlanChildController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> additionPlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal String uid)
             throws ExecutionException, InterruptedException {
-
+        log.info("Child plan addition API received!");
         return planChildService.postChildNewPlan(request, uid);
     }
 
