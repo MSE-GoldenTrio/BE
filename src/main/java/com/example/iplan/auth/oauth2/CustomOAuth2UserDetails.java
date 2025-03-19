@@ -25,13 +25,11 @@ import java.util.Map;
 public class CustomOAuth2UserDetails implements OAuth2User, UserDetails {
     private Users user;
     private Map<String, Object> attributes;
-    private String jwtToken;
 
     // 일반 로그인 사용자를 위한 생성자 (OAuth2 attributes 없이 생성)
     public CustomOAuth2UserDetails(Users user) {
         this.user = user;
         this.attributes = null; // 일반 로그인 사용자는 attributes 없음
-        this.jwtToken = null;
     }
 
     // Spring Security의 권한 정보 반환
