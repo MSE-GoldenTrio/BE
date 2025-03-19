@@ -1,6 +1,7 @@
 package com.example.iplan.config;
 
 import com.example.iplan.auth.oauth2.CustomOAuth2UserService;
+import com.example.iplan.auth.oauth2.OAuth2SuccessHandler;
 import com.example.iplan.config.jwt.JwtAuthenticationFilter;
 import com.example.iplan.config.jwt.JwtTokenProvider;
 import com.google.firebase.auth.FirebaseAuth;
@@ -30,6 +31,7 @@ public class SecurityConfig{
     private final JwtTokenProvider jwtTokenProvider;
     private final FirebaseAuth firebaseAuth;
     private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
@@ -68,11 +70,14 @@ public class SecurityConfig{
                 )
                 // OAuth2 로그인 후 JWT 발급 및 리다이렉트 처리
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(auth -> auth
+                                .baseUri("/oauth2/authorization") // 프론트에서 OAuth2 인증 요청 URL 설정
+                        )
+                        .redirectionEndpoint(redir -> redir
+                                .baseUri("/login/oauth2/code/*") // 카카오, 구글, 네이버에서 로그인 성공 후 백엔드로 인가 코드를 포함하여 보낼 리디렉션 URL 설정
+                        )
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
-                        .successHandler((request, response, authentication) -> {
-                            log.info("OAuth2 Login Successfully: " + authentication.getName());
-                            response.sendRedirect("http://localhost:8080/register");
-                        })
+                        .successHandler(oAuth2SuccessHandler) // 로그인 성공 핸들러
                 )
 
                 .logout(logout -> logout.disable());
