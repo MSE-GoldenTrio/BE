@@ -45,7 +45,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
      */
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) {
-        log.info("OAuth2 Login Start" + userRequest.getClientRegistration().getRegistrationId());
+        log.info("OAuth2 Login Start: " + userRequest.getClientRegistration().getRegistrationId());
 
         OAuth2User oAuth2User = super.loadUser(userRequest);
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
@@ -67,10 +67,10 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         // JWT 발급 (닉네임을 랜덤으로 지정한 후 바로 발급)
-        JwtToken jwtToken = generateJwtToken(user);
-        log.info("OAuth2 Login JWT Token: {}", jwtToken.getAccessToken());
+//        JwtToken jwtToken = generateJwtToken(user);
+//        log.info("OAuth2 Login JWT Token: {}", jwtToken.getAccessToken());
 
-        return new CustomOAuth2UserDetails(user, oAuth2User.getAttributes(), jwtToken.getAccessToken());
+        return new CustomOAuth2UserDetails(user, oAuth2User.getAttributes());
     }
 
     /**
@@ -95,7 +95,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         .name(oAuth2UserInfo.getName())
                         .nickname(randomNickname) // 랜덤 닉네임 할당
                         .password("")
-                        .authority(UserRole.CHILD) // UserRole 타입으로 직접 전달
+                        .authority(UserRole.UNKNOWN) // UserRole 타입으로 직접 전달, 아직 권한 미지정
                         .build();
                 userRepository.save(user);
 
