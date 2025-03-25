@@ -74,6 +74,22 @@ public class PlanChildController {
     }
 
     /**
+     * 사용자의 전체 계획 목록 반환(날짜 상관 없음)
+     * @param nickname
+     * @return
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    @Operation(summary = "계획 목록 조회 GET", description = "해당 사용자의 전체 계획 목록을 가져온다.")
+    @GetMapping("/list")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getPlanList(@AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
+
+        Map<String, Object> response = planChildService.getAllPlans(nickname);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /**
      * (목표 탭에서 해당 날짜에서 특정 계획 클릭시)특정 계획의 세부사항을 확인한다.
      * @param documentID
      * @return
@@ -93,7 +109,7 @@ public class PlanChildController {
     /**
      * 특정 계획 수정
      * @param request
-     * @param uid
+     * @param nickname
      * @return
      * @throws ExecutionException
      * @throws InterruptedException
@@ -101,9 +117,9 @@ public class PlanChildController {
     @Operation(summary = "단일 계획 업데이트 UPDATE", description = "특정 계획 데이터 값을 바꾼다.(계획 달성 체크의 경우도 해당), Id 필수")
     @PatchMapping("/update-plan")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> updatePlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal String uid) throws ExecutionException, InterruptedException {
-
-        return planChildService.updateOriginalPlan(request, uid);
+    public ResponseEntity<Map<String, Object>> updatePlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
+        log.info("Child's plan 'is_completed' update");
+        return planChildService.updateOriginalPlan(request, nickname);
     }
 
     /**
