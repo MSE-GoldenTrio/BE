@@ -9,6 +9,7 @@ import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PlanChildService {
@@ -52,17 +54,18 @@ public class PlanChildService {
                 .is_completed(planPostDto.is_completed())
                 .build();
 
-        if(planPost.getUser_id() != null && !planPost.getUser_id().isEmpty()){
-            planChildRepository.save(planPost);
+        if (planPost.getUser_id() != null && !planPost.getUser_id().isEmpty()) {
+            // Auto Increment된 ID로 저장
+            planChildRepository.saveWithAutoIncrement(planPost);
+            log.info("Saved successfully!! Plan ID: {}", planPost.getId());
+
             response.put("success", true);
             response.put("message", "계획이 정상적으로 추가되었습니다.");
-            response.put("entity", planPost.getId());
+            response.put("id", planPost.getId());
 
             response = dayDataService.GenerateOrSaveDayPlanData(response, planPost, user_id);
             return new ResponseEntity<>(response, HttpStatus.OK);
-        }
-        else
-        {
+        } else {
             throw new CustomException("유저 아이디가 올바르지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -116,6 +119,36 @@ public class PlanChildService {
         return planDtoList;
     }
 
+    /**
+     * 날짜 제한 없이 사용자의 모든 계획 목록을 반환
+     * @param user_id
+     * @return
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public Map<String, Object> getAllPlans(String user_id) throws ExecutionException, InterruptedException {
+        Map<String, Object> response = new HashMap<>();
+
+        // 사용자 ID 기준으로 Firestore에서 모든 계획 가져오기
+        List<PlanChild> plans = planChildRepository.findEntityAll(user_id);
+
+        if (plans == null || plans.isEmpty()) {
+            response.put("success", false);
+            response.put("message", "등록된 계획이 없습니다.");
+        } else {
+            // Firestore의 문서 ID를 PlanChild 객체에 설정
+            for (PlanChild plan : plans) {
+                if (plan.getId() == null) {
+                    plan.setId(UUID.randomUUID().toString()); // ID가 없으면 임시 ID 부여
+                }
+            }
+            response.put("success", true);
+            response.put("plans", plans);
+        }
+
+        return response;
+    }
+
     public ResponseEntity<Map<String, Object>> findByPlanID(String documentID) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
 
@@ -145,7 +178,7 @@ public class PlanChildService {
         PlanChild originalPlan = planChildRepository.findEntityByDocumentId(planChildDTO.getId());
 
         if(originalPlan == null){
-            throw new CustomException("해당 Id의 PlanChild문서가 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("해당 Id의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
         }
 
         if(!Objects.equals(originalPlan.getUser_id(), user_id))
@@ -168,6 +201,7 @@ public class PlanChildService {
             throw new CustomException("계획 업데이트에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
+        log.info("Updated successfully!");
         response.put("success", true);
         response.put("message", "계획이 정상적으로 업데이트 되었습니다");
         return new ResponseEntity<>(response, HttpStatus.OK);
