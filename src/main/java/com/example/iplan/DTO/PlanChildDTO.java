@@ -1,6 +1,7 @@
 package com.example.iplan.DTO;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.firebase.database.annotations.NotNull;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -16,6 +17,7 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)  // 불필요한 null 값을 제거할 수 있도록 수정 -> 프론트엔드에서 불필요한 데이터 관리 필요 없음
 @Schema(description = "계획 하나의 데이터를 나타내는 DTO")
 public class PlanChildDTO {
 
@@ -26,7 +28,6 @@ public class PlanChildDTO {
     private String user_id;
 
     @Schema(description = "계획 제목", example = "수학 익힘책 23p 풀기", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull
     private String title;
 
     @Schema(description = "알람 설정 여부", example = "true")
@@ -40,7 +41,6 @@ public class PlanChildDTO {
 
     @Schema(description = "계획이 추가된 날짜", example = "2025-01-22", requiredMode = Schema.RequiredMode.REQUIRED)
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @NotNull
     private String post_date;
 
     @JsonFormat(pattern = "HH:mm")
@@ -52,6 +52,5 @@ public class PlanChildDTO {
     private String plan_end_time;
 
     @Schema(description = "계획 달성 여부", example = "false", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull
     private boolean is_completed;
 }
