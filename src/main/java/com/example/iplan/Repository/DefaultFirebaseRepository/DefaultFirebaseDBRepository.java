@@ -9,10 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Component
@@ -50,6 +47,80 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
 
         // 4. 엔티티의 @DocumentId 필드에 값 설정
         setDocumentIdField(entity, documentId);
+    }
+
+    // 원하는 ID로 문서 저장하는 메서드 추가
+    public void saveWithId(T entity, String documentId) throws ExecutionException, InterruptedException {
+        CollectionReference collection = firestore.collection(collectionName);
+
+        // Firestore에 데이터 저장 (문서 ID를 직접 지정)
+        ApiFuture<WriteResult> result = collection.document(documentId).set(entity);
+        result.get(); // 저장 완료 대기
+
+        // @DocumentId 필드에 직접 지정한 ID를 설정
+        setDocumentIdField(entity, documentId);
+    }
+
+    /**
+     * Firestore에서 Auto Increment ID를 생성하는 메서드
+     */
+    public int getNextAutoIncrementId(String collectionName) throws ExecutionException, InterruptedException {
+        DocumentReference counterRef = firestore.collection("Counters").document(collectionName);
+
+        // 🔹 트랜잭션을 사용하여 문서가 없으면 자동 생성
+        return firestore.runTransaction(transaction -> {
+            DocumentSnapshot snapshot = transaction.get(counterRef).get();
+            int newId = 1;
+
+            if (!snapshot.exists()) {
+                // 🔥 문서가 없으면 새 문서를 생성하고 lastId를 1로 설정
+                Map<String, Object> initData = new HashMap<>();
+                initData.put("lastId", 1);
+                transaction.set(counterRef, initData);
+            } else {
+                // 🔥 기존 lastId 값을 +1 증가
+                newId = snapshot.getLong("lastId").intValue() + 1;
+                transaction.update(counterRef, "lastId", newId);
+            }
+
+            return newId;
+        }).get();
+    }
+
+
+    /**
+     * Auto Increment된 ID를 사용하여 저장하는 saveWithId 메서드
+     */
+    public void saveWithAutoIncrement(T entity) throws ExecutionException, InterruptedException {
+        CollectionReference collection = firestore.collection(collectionName);
+
+        // 🔥 Auto Increment ID 가져오기
+        String documentId = String.valueOf(getNextAutoIncrementId(collectionName));
+
+        // Firestore에 데이터 저장
+        ApiFuture<WriteResult> result = collection.document(documentId).set(entity);
+        result.get(); // 저장 완료 대기
+
+        // @DocumentId 필드에 Auto Increment된 ID 설정
+        setDocumentIdField(entity, documentId);
+    }
+
+    // Entity 저장 메서드 - 저장 후 엔티티 반환
+    public T saveAndReturn(T entity) throws ExecutionException, InterruptedException {
+        CollectionReference collection = firestore.collection(collectionName);
+
+        // 1. 고유 Document ID 생성
+        String documentId = UUID.randomUUID().toString();
+
+        // 2. Firestore에 데이터 저장
+        ApiFuture<WriteResult> result = collection.document(documentId).set(entity);
+        result.get(); // 저장이 완료될 때까지 대기
+
+        // 3. 엔티티의 @DocumentId 필드에 ID 설정
+        setDocumentIdField(entity, documentId);
+
+        // ✅ 저장된 엔티티를 반환하도록 수정
+        return entity;
     }
 
     // @DocumentId 필드에 ID를 설정하는 헬퍼 메서드
