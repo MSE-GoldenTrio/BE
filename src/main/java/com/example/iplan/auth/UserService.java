@@ -45,8 +45,9 @@ public class UserService {
                     .authority(role)    // child, parent
                     .build();
 
-            // 3. 사용자 정보 User 컬렉션에 저장
-            userRepository.save(user);
+            // 3. 사용자 정보 User 컬렉션에 저장 -> 자동 증가된 ID로 저장
+            userRepository.saveWithAutoIncrement(user);
+
             return "Sign Up Successfully";
         } catch (ExecutionException | InterruptedException e) {
             throw new RuntimeException("Error accessing Firestore", e);
