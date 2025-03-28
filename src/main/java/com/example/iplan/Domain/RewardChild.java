@@ -38,7 +38,6 @@ public class RewardChild {
     @JsonFormat(pattern = "dd")
     private String day;
 
-    @NotNull
     private String plan_id;  // 이 보상이 어떤 계획과 연관되어 있는지 나타냄
 
     private boolean rewarded; // 보상이 지급되었는지 여부 -> 첨삭 여부
