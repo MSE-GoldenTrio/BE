@@ -64,7 +64,7 @@ public class PlanChildController {
             parameters = {
                     @Parameter(name = "targetDate", description = "원하는 년/월/일", example = "2025-01-15", required = true)
             })
-    @GetMapping("/dayPlanList/{targetDate}")
+    @GetMapping("/dayPlanListTitle/{targetDate}")
     public ResponseEntity<Map<String, Object>> showPlanList
     (@AuthenticationPrincipal String uid,
      @PathVariable @Parameter(description = "원하는 년/월/일", example = "2025-01-15") String targetDate) throws ExecutionException, InterruptedException {
