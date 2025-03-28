@@ -37,7 +37,7 @@ public class PlanChildController {
     /**
      * (목표 탭에서 계획 추가하기 버튼 클릭시) 해당 날짜에 단일 계획을 추가한다
      * @param request PlanChildDto
-     * @param uid 유저 아이디
+     * @param nickname 유저 아이디
      * @return 성공 여부 및 오류 메세지
      * @throws ExecutionException
      * @throws InterruptedException
@@ -48,10 +48,10 @@ public class PlanChildController {
     })
     @PostMapping("/addition")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> additionPlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal String uid)
+    public ResponseEntity<Map<String, Object>> additionPlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal String nickname)
             throws ExecutionException, InterruptedException {
         log.info("Child plan addition API received!");
-        return planChildService.postChildNewPlan(request, uid);
+        return planChildService.postChildNewPlan(request, nickname);
     }
 
     /**

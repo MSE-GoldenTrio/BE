@@ -9,6 +9,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -91,16 +92,48 @@ public class UserService {
         }
     }
 
-    // 특정 사용자 조회
-    public Users getUserById(String userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+    /**
+     * 닉네임을 기반으로 사용자 조회
+     */
+    public Users findByNickname(String nickname) {
+        Optional<Users> user = userRepository.findByNickname(nickname);
+        return user.orElse(null); // 사용자 없을 경우 null 반환
     }
 
-    // 아이디(닉네임) 중복 체크
+    /**
+     * 아이디(닉네임 중복 체크
+     */
     public boolean isNicknameAvailable(String nickname) {
         Optional<Users> user = userRepository.findByNickname(nickname);
         return user.isEmpty(); // 사용 가능하면 true, 중복이면 false
+    }
+
+    /**
+     * 소셜 로그인 성공 이후 추가 정보(역할) 업데이트
+     */
+    public void updateUserRole(String nickname, String roleStr) {
+        try {
+            // 닉네임으로 사용자 조회
+            Users user = userRepository.findByNickname(nickname)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+            // 문자열을 UserRole Enum으로 변환
+            UserRole role = UserRole.fromString(roleStr);
+            user.setAuthority(role); // ✅ 역할 업데이트
+
+            userRepository.update(user);
+            log.info("Updated successfully: {}, {}", nickname, role);
+        } catch (ExecutionException e) {
+            log.error("Firestore ExecutionException Error.. {}", e.getMessage());
+            throw new RuntimeException("Firestore 데이터 처리 중 오류 발생", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Firestore InterruptedException Error.. {}", e.getMessage());
+            throw new RuntimeException("Firestore 작업이 중단되었습니다.", e);
+        } catch (Exception e) {
+            log.error("Error..{}", e.getMessage());
+            throw new RuntimeException("사용자 역할 업데이트 처리 중 오류 발생", e);
+        }
     }
 }
 
