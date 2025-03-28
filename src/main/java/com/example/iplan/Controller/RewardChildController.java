@@ -75,7 +75,7 @@ public class RewardChildController {
 
     /**
      * 보상을 수정
-     * @param reward 수정할 Reward 객체
+     * @param rewardDto 수정할 Reward 객체
      * @return 성공 여부 및 오류 메시지
      * @throws ExecutionException
      * @throws InterruptedException
@@ -85,10 +85,11 @@ public class RewardChildController {
                     content = {
                             @Content(schema = @Schema(implementation = RewardChildDTO.class))
                     }))
-    @PatchMapping()
+    @PatchMapping("/update")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> updateReward(@AuthenticationPrincipal String user_id, @RequestBody @NotNull RewardChildDTO reward) throws ExecutionException, InterruptedException {
-        return rewardChildService.updateReward(user_id, reward);
+    public ResponseEntity<Map<String, Object>> updateReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
+        log.info("Received RewardChildDTO for update reward: {}, AuthenticationPrincipal email: {}", rewardDto, nickname);
+        return rewardChildService.updateReward(rewardDto, nickname);
     }
 
     /**
