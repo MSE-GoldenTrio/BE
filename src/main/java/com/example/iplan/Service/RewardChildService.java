@@ -9,6 +9,7 @@ import com.example.iplan.Repository.RewardParentsRepository;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.Users;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,11 +23,12 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class RewardChildService {
 
-    private final RewardChildRepository rewardRepository;
+    private final RewardChildRepository rewardChildRepository;
     private final RewardParentsRepository rewardParentsRepository;
     private final UserRepository userRepository;
     /**
@@ -45,17 +47,22 @@ public class RewardChildService {
 
         // 빌더 패턴을 사용하여 RewardChild 객체 생성
         RewardChild reward = RewardChild.builder()
-                .user_id(rewardDto.getUser_id())
+                .user_id(nickname)
                 .content(rewardDto.getContent())
                 .date(rewardDto.getDate())
-                .plan_id(rewardDto.getPlan_id())
+                .year(rewardDto.getYear())
+                .month(rewardDto.getMonth())
+                .day(rewardDto.getDay())
                 .rewarded(rewardDto.isRewarded())
                 .build();
 
         try {
-            rewardRepository.save(reward);
+            rewardChildRepository.saveWithAutoIncrement(reward);
+            log.info("Saved successfully!! Reward ID: {}", reward.getId());
+
             response.put("success", true);
             response.put("message", "보상이 정상적으로 저장되었습니다.");
+            response.put("id", reward.getId());
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
             throw new CustomException("보상 저장에 실패했습니다. Error: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
@@ -71,7 +78,7 @@ public class RewardChildService {
      */
     public RewardChild getReward(String id) throws ExecutionException, InterruptedException {
         try {
-            return rewardRepository.findEntityByDocumentId(id);
+            return rewardChildRepository.findEntityByDocumentId(id);
         } catch (Exception e) {
             throw new ExecutionException("보상 조회에 실패했습니다. Error: " + e, e);
         }
@@ -89,7 +96,7 @@ public class RewardChildService {
 
         try {
             // 해당 ID의 보상을 조회
-            RewardChild reward = rewardRepository.findEntityByDocumentId(documentID);
+            RewardChild reward = rewardChildRepository.findEntityByDocumentId(documentID);
             if (reward == null) {
                 throw new CustomException("해당 ID의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
             }
@@ -100,8 +107,8 @@ public class RewardChildService {
             }
 
             // 지급되지 않은 보상만 삭제 허용
-            RewardChild rewardChild = rewardRepository.findEntityByDocumentId(documentID);
-            rewardRepository.delete(rewardChild);
+            RewardChild rewardChild = rewardChildRepository.findEntityByDocumentId(documentID);
+            rewardChildRepository.delete(rewardChild);
             response.put("success", true);
             response.put("message", "보상이 정상적으로 삭제되었습니다.");
             return new ResponseEntity<>(response, HttpStatus.OK);
@@ -118,36 +125,35 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> updateReward(String user_id, RewardChildDTO rewardDto) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updateReward(RewardChildDTO rewardDto, String nickname) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
 
-        RewardChild existingReward = rewardRepository.findEntityByDocumentId(rewardDto.getId());
+        RewardChild existingReward = rewardChildRepository.findEntityByDocumentId(rewardDto.getId());
 
         if (existingReward == null) {
             throw new CustomException("해당 ID의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
         }
 
-        // RewardParents에서 같은 plan_id를 가진 문서를 찾는다.
-        List<RewardParents> rewardParentsList = rewardParentsRepository.findByPlanId(user_id, rewardDto.getPlan_id());
+        // 날짜 문자열에서 yyyy-MM-dd만 추출
+        String dateOnly = rewardDto.getDate().substring(0, 10); // "2025-03-27"
 
-        // 같은 plan_id를 가진 RewardParents 중에서 is_rewarded가 true인 경우 수정할 수 없다.
-        boolean isAnyRewarded = rewardParentsList.stream().anyMatch(RewardParents::isRewarded);
-        if (isAnyRewarded) {
-            throw new CustomException("해당 계획에 대한 부모님의 보상이 이미 지급되어 수정할 수 없습니다.", HttpStatus.FORBIDDEN);
+        // 해당 날짜의 보상 조회
+        RewardChild rewardChildOnSameDay = rewardChildRepository.findRewardChildByDay(nickname, dateOnly);
+
+        // 만약 해당 날짜의 보상이 이미 지급된 상태라면 수정 금지
+        if (rewardChildOnSameDay != null && rewardChildOnSameDay.isRewarded()) {
+            throw new CustomException("해당 날짜의 보상이 이미 지급되어 수정할 수 없습니다.", HttpStatus.FORBIDDEN);
         }
 
-        // 빌더 패턴을 사용하여 새롭게 RewardChild 객체를 생성하고 업데이트
         RewardChild updatedReward = RewardChild.builder()
-                .id(existingReward.getId()) // 기존 ID 유지
+                .id(existingReward.getId())
                 .user_id(rewardDto.getUser_id() != null ? rewardDto.getUser_id() : existingReward.getUser_id())
                 .content(rewardDto.getContent() != null ? rewardDto.getContent() : existingReward.getContent())
                 .date(rewardDto.getDate() != null ? rewardDto.getDate() : existingReward.getDate())
-                .plan_id(rewardDto.getPlan_id() != null ? rewardDto.getPlan_id() : existingReward.getPlan_id())
-                .rewarded(rewardDto.isRewarded())
                 .build();
 
         try {
-            rewardRepository.update(updatedReward);
+            rewardChildRepository.update(updatedReward);
             response.put("success", true);
             response.put("message", "보상이 정상적으로 수정되었습니다.");
             return new ResponseEntity<>(response, HttpStatus.OK);
@@ -171,7 +177,7 @@ public class RewardChildService {
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
 
         // 모든 보상 가져오기
-        List<RewardChildDTO> rewards = rewardRepository.findRewardChildDtoByUserId(userId);
+        List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(userId);
 
         // 보상 중에서 해당 기간에 달성된 보상만 필터링하여 계산
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
@@ -198,7 +204,7 @@ public class RewardChildService {
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
 
         // 모든 보상 가져오기
-        List<RewardChildDTO> rewards = rewardRepository.findRewardChildDtoByUserId(userId);
+        List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(userId);
 
         // 보상 중에서 해당 기간에 success 가 true 인 달성된 보상만 필터링하여 계산
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
@@ -227,7 +233,7 @@ public class RewardChildService {
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
 
         // 모든 보상 가져오기
-        List<RewardChildDTO> rewards = rewardRepository.findRewardChildDtoByUserId(userId);
+        List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(userId);
 
         // 보상 중에서 해당 기간에 rewarded 가 true 인 달성된 보상만 필터링하여 계산
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
@@ -254,7 +260,7 @@ public class RewardChildService {
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
 
         // 모든 보상 가져오기
-        List<RewardChildDTO> rewards = rewardRepository.findRewardChildDtoByUserId(userId);
+        List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(userId);
 
         // 보상 중에서 해당 기간에 rewarded 가 true 인 달성된 보상만 필터링하여 계산
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
@@ -281,7 +287,7 @@ public class RewardChildService {
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
 
         // 모든 보상 가져오기
-        List<RewardChildDTO> rewards = rewardRepository.findRewardChildDtoByUserId(userId);
+        List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(userId);
 
         // 보상 중에서 해당 기간에 포함되는 rewarded 가 true 인 보상만 필터링하여 리스트 반환
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
@@ -308,7 +314,7 @@ public class RewardChildService {
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
 
         // 모든 보상 가져오기
-        List<RewardChildDTO> rewards = rewardRepository.findRewardChildDtoByUserId(userId);
+        List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(userId);
 
         // 보상 중에서 해당 기간에 포함되는 rewarded 가 false 인 보상만 필터링하여 리스트 반환
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
