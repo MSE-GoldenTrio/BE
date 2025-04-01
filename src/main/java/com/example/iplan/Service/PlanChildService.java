@@ -145,7 +145,7 @@ public class PlanChildService {
             response.put("success", true);
             response.put("plans", plans);
         }
-
+        log.info("Get plan successfully!");
         return response;
     }
 
