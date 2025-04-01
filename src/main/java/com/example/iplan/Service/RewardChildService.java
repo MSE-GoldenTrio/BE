@@ -85,6 +85,41 @@ public class RewardChildService {
     }
 
     /**
+     * 특정 날짜의 보상을 가져오는 기능
+     * @param nickname 사용자 ID
+     * @param year 해당 연도 (예: 2025)
+     * @param month 해당 월 (예: 3)
+     * @param day 해당 일 (예: 28)
+     * @return 해당 날짜의 보상 객체 (RewardChildDTO)
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public RewardChildDTO getDailyReward(String nickname, int year, int month, int day) throws ExecutionException, InterruptedException {
+        String formattedDate = String.format("%04d-%02d-%02d", year, month, day); // "2025-03-28" 형식으로 만들기
+
+        RewardChild rewardChild = rewardChildRepository.findRewardChildByDay(nickname, formattedDate);
+
+        if (rewardChild == null) {
+            return null;  // 해당 날짜의 보상이 존재하지 않으면 null 반환
+        }
+
+        log.info("Daily reward: {}", rewardChild.getContent());
+
+        // DTO로 변환하여 반환
+        return RewardChildDTO.builder()
+                .id(rewardChild.getId())
+                .user_id(rewardChild.getUser_id())
+                .content(rewardChild.getContent())
+                .date(rewardChild.getDate())
+                .year(rewardChild.getYear())
+                .month(rewardChild.getMonth())
+                .day(rewardChild.getDay())
+                .rewarded(rewardChild.isRewarded())
+                .success(rewardChild.isSuccess())
+                .build();
+    }
+
+    /**
      * 보상을 ID로 삭제하는 기능
      * @param documentID 삭제할 보상의 ID
      * @return 삭제 결과
