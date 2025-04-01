@@ -74,6 +74,42 @@ public class RewardChildController {
     }
 
     /**
+     * 특정 날짜의 보상을 가져옴
+     * @param year 해당 연도
+     * @param month 해당 월 (1월은 1, 12월은 12)
+     * @param day 해당 일 (01, 02, ..., 31)
+     * @return 해당 날짜의 보상 정보
+     */
+    @Operation(summary = "특정 날짜의 보상 GET", description = "특정 날짜의 보상을 가져온다.")
+    @GetMapping("/daily-reward")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getDailyReward(
+            @RequestParam int year,
+            @RequestParam int month,
+            @RequestParam int day,
+            @AuthenticationPrincipal String nickname) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            RewardChildDTO reward = rewardChildService.getDailyReward(nickname, year, month, day);
+
+            if (reward != null) {
+                response.put("success", true);
+                response.put("reward", reward);
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("success", false);
+                response.put("message", "해당 날짜에 대한 보상이 존재하지 않습니다.");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        } catch (ExecutionException | InterruptedException e) {
+            response.put("success", false);
+            response.put("message", "보상 데이터를 가져오는 데 실패했습니다. Error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
      * 보상을 수정
      * @param rewardDto 수정할 Reward 객체
      * @return 성공 여부 및 오류 메시지
