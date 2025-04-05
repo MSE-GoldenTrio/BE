@@ -39,9 +39,14 @@ public class PlanChildDTO {
     @Schema(description = "계획에 대한 부연 설명 혹은 중요한 점 메모", example = "10p 참고하면서 하기")
     private String memo;
 
-    @Schema(description = "계획이 추가된 날짜", example = "2025-01-22", requiredMode = Schema.RequiredMode.REQUIRED)
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    private String post_date;
+    @JsonFormat(pattern = "yyyy")
+    private String post_year;
+
+    @JsonFormat(pattern = "MM")
+    private String post_month;
+
+    @JsonFormat(pattern = "dd")
+    private String post_day;
 
     @JsonFormat(pattern = "HH:mm")
     @Schema(description = "계획 시작 시간", example = "14:00")
