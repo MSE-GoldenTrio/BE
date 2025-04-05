@@ -154,7 +154,7 @@ public class RewardParentsService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         return (int) rewards.stream()
                 .filter(reward -> {
-                    LocalDate rewardDate = LocalDate.parse(reward.getDate(), formatter);
+                    LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate) && !reward.isRewarded();
                 })
                 .count();
@@ -181,7 +181,7 @@ public class RewardParentsService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         return rewards.stream()
                 .filter(reward -> {
-                    LocalDate rewardDate = LocalDate.parse(reward.getDate(), formatter);
+                    LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate) && !reward.isRewarded();
                 })
                 .toList();

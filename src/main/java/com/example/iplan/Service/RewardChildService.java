@@ -49,10 +49,10 @@ public class RewardChildService {
         RewardChild reward = RewardChild.builder()
                 .user_id(nickname)
                 .content(rewardDto.getContent())
-                .date(rewardDto.getDate())
-                .year(rewardDto.getYear())
-                .month(rewardDto.getMonth())
-                .day(rewardDto.getDay())
+                .post_date(rewardDto.getPost_date())
+                .post_year(rewardDto.getPost_year())
+                .post_month(rewardDto.getPost_month())
+                .post_day(rewardDto.getPost_day())
                 .rewarded(rewardDto.isRewarded())
                 .build();
 
@@ -110,13 +110,42 @@ public class RewardChildService {
                 .id(rewardChild.getId())
                 .user_id(rewardChild.getUser_id())
                 .content(rewardChild.getContent())
-                .date(rewardChild.getDate())
-                .year(rewardChild.getYear())
-                .month(rewardChild.getMonth())
-                .day(rewardChild.getDay())
+                .post_date(rewardChild.getPost_date())
+                .post_year(rewardChild.getPost_year())
+                .post_month(rewardChild.getPost_month())
+                .post_day(rewardChild.getPost_day())
                 .rewarded(rewardChild.isRewarded())
                 .success(rewardChild.isSuccess())
                 .build();
+    }
+
+    /**
+     * 사용자의 모든 보상을 조회하는 기능
+     * @param nickname 사용자 닉네임 (AuthenticationPrincipal로 인증된 사용자)
+     * @return 사용자의 모든 보상 목록 (RewardChildDTO 리스트)
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public List<RewardChildDTO> getAllRewards(String nickname) throws ExecutionException, InterruptedException {
+        // 사용자가 존재하는지 확인
+        Users user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        log.info("Get all rewards start!!");
+        try {
+            // 사용자의 모든 보상을 가져오기
+            List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(nickname);
+
+            if (rewards.isEmpty()) {
+                log.info("{}'s reward is not exist.", nickname);
+            } else {
+                log.info("{}'s rewards received successfully!! Size: {}", nickname, rewards.size());
+            }
+
+            return rewards;
+        } catch (Exception e) {
+            log.error("Error of {}: {}", nickname, e.getMessage());
+            throw new ExecutionException("보상 목록을 가져오는 중 오류가 발생했습니다.", e);
+        }
     }
 
     /**
@@ -170,13 +199,21 @@ public class RewardChildService {
         }
 
         // 날짜 문자열에서 yyyy-MM-dd만 추출
-        String dateOnly = rewardDto.getDate().substring(0, 10); // "2025-03-27"
+        String dateOnly = rewardDto.getPost_date().substring(0, 10); // "2025-03-27"
 
         // 해당 날짜의 보상 조회
         RewardChild rewardChildOnSameDay = rewardChildRepository.findRewardChildByDay(nickname, dateOnly);
 
+        // 보상 데이터 조회 결과 확인
+        if (rewardChildOnSameDay == null) {
+            log.info("rewardChildOnSameDay is null. No reward found for date: {}", dateOnly);
+        } else {
+            log.info("rewardChildOnSameDay found. isRewarded: {}", rewardChildOnSameDay.isRewarded());
+        }
+
         // 만약 해당 날짜의 보상이 이미 지급된 상태라면 수정 금지
         if (rewardChildOnSameDay != null && rewardChildOnSameDay.isRewarded()) {
+            log.info("Error: reward is already rewarded");
             throw new CustomException("해당 날짜의 보상이 이미 지급되어 수정할 수 없습니다.", HttpStatus.FORBIDDEN);
         }
 
@@ -184,13 +221,17 @@ public class RewardChildService {
                 .id(existingReward.getId())
                 .user_id(rewardDto.getUser_id() != null ? rewardDto.getUser_id() : existingReward.getUser_id())
                 .content(rewardDto.getContent() != null ? rewardDto.getContent() : existingReward.getContent())
-                .date(rewardDto.getDate() != null ? rewardDto.getDate() : existingReward.getDate())
+                .post_date(rewardDto.getPost_date() != null ? rewardDto.getPost_date() : existingReward.getPost_date())
+                .post_year(rewardDto.getPost_date() != null ? rewardDto.getPost_year() : existingReward.getPost_year())
+                .post_month(rewardDto.getPost_date() != null ? rewardDto.getPost_month() : existingReward.getPost_month())
+                .post_day(rewardDto.getPost_date() != null ? rewardDto.getPost_day() : existingReward.getPost_day())
                 .build();
 
         try {
             rewardChildRepository.update(updatedReward);
             response.put("success", true);
             response.put("message", "보상이 정상적으로 수정되었습니다.");
+            log.info("Reward updated successfully!!");
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
             throw new CustomException("보상 수정에 실패했습니다. Error: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
@@ -218,7 +259,7 @@ public class RewardChildService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         return (int) rewards.stream()
                 .filter(reward -> {
-                    LocalDate rewardDate = LocalDate.parse(reward.getDate(), formatter);
+                    LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate);
                 })
                 .count();
@@ -245,7 +286,7 @@ public class RewardChildService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         return (int) rewards.stream()
                 .filter(reward -> {
-                    LocalDate rewardDate = LocalDate.parse(reward.getDate(), formatter);
+                    LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate) && reward.isSuccess();
                 })
                 .count();
@@ -274,7 +315,7 @@ public class RewardChildService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         return (int) rewards.stream()
                 .filter(reward -> {
-                    LocalDate rewardDate = LocalDate.parse(reward.getDate(), formatter);
+                    LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate) && reward.isRewarded();
                 })
                 .count();
@@ -301,7 +342,7 @@ public class RewardChildService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         return (int) rewards.stream()
                 .filter(reward -> {
-                    LocalDate rewardDate = LocalDate.parse(reward.getDate(), formatter);
+                    LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate) && !reward.isRewarded();
                 })
                 .count();
@@ -327,7 +368,7 @@ public class RewardChildService {
         // 보상 중에서 해당 기간에 포함되는 rewarded 가 true 인 보상만 필터링하여 리스트 반환
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         return rewards.stream().filter(reward -> {
-                    LocalDate rewardDate = LocalDate.parse(reward.getDate(), formatter);
+                    LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate) && reward.isRewarded();
                 })
                 .toList();
@@ -354,7 +395,7 @@ public class RewardChildService {
         // 보상 중에서 해당 기간에 포함되는 rewarded 가 false 인 보상만 필터링하여 리스트 반환
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         return rewards.stream().filter(reward -> {
-                    LocalDate rewardDate = LocalDate.parse(reward.getDate(), formatter);
+                    LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate) && !reward.isRewarded();
                 })
                 .toList();
