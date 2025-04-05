@@ -27,16 +27,16 @@ public class RewardChild {
     private String content; // 보상의 내용
 
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private String date; // 보상이 적용된 날짜
+    private String post_date; // 보상이 적용된 날짜
 
     @JsonFormat(pattern = "yyyy")
-    private String year;
+    private String post_year;
 
     @JsonFormat(pattern = "MM")
-    private String month;
+    private String post_month;
 
     @JsonFormat(pattern = "dd")
-    private String day;
+    private String post_day;
 
     private String plan_id;  // 이 보상이 어떤 계획과 연관되어 있는지 나타냄
 
