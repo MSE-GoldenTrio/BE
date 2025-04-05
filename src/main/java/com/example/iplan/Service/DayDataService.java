@@ -18,7 +18,7 @@ public class DayDataService {
     private final DayDataRepository dayDataRepository;
 
     public Map<String, Object> GenerateOrSaveDayPlanData(Map<String, Object> response, PlanChild planChild, String user_id) throws ExecutionException, InterruptedException {
-        String yearMonthDate = planChild.getPost_year() + "-" + planChild.getPost_month() + "-" + planChild.getPost_date();
+        String yearMonthDate = planChild.getPost_year() + "-" + planChild.getPost_month() + "-" + planChild.getPost_day();
         DayData targetDayData = dayDataRepository.findTargetDayData(user_id, yearMonthDate);
 
         if(targetDayData == null){
@@ -29,7 +29,7 @@ public class DayDataService {
                     .user_id(user_id)
                     .year(planChild.getPost_year())
                     .month(planChild.getPost_month())
-                    .date(planChild.getPost_date())
+                    .date(planChild.getPost_day())
                     .plan_idList(newPlanList)
                     .is_rewarded(false)
                     .build();
