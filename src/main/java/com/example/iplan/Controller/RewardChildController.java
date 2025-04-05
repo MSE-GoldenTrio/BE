@@ -43,10 +43,10 @@ public class RewardChildController {
      * @throws InterruptedException
      */
     @Operation(summary = "보상 추가 POST", description = "받고 싶은 보상을 입력(추가)한다.",
-    requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            content = {
-                    @Content(schema = @Schema(implementation = RewardChildDTO.class))
-            }))
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = {
+                            @Content(schema = @Schema(implementation = RewardChildDTO.class))
+                    }))
     @PostMapping
     @ResponseBody
     public ResponseEntity<Map<String, Object>> saveReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
@@ -108,6 +108,36 @@ public class RewardChildController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+
+    /**
+     * 사용자의 모든 보상을 조회
+     * @param nickname 사용자 이름 (AuthenticationPrincipal로 인증된 사용자)
+     * @return 모든 보상 목록
+     */
+    @Operation(summary = "모든 보상 목록 GET", description = "해당 사용자의 모든 보상 목록을 조회한다.")
+    @GetMapping("/all-rewards")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getAllRewards(@AuthenticationPrincipal String nickname) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<RewardChildDTO> rewards = rewardChildService.getAllRewards(nickname);
+
+            if (rewards.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "보상 목록이 존재하지 않습니다.");
+            } else {
+                response.put("success", true);
+                response.put("rewards", rewards);
+            }
+
+            return ResponseEntity.ok(response);
+        } catch (ExecutionException | InterruptedException e) {
+            response.put("success", false);
+            response.put("message", "보상 목록을 가져오는 데 실패했습니다. Error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
 
     /**
      * 보상을 수정
