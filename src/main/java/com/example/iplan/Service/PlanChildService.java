@@ -38,7 +38,6 @@ public class PlanChildService {
      */
     public ResponseEntity<Map<String, Object>> postChildNewPlan(PlanChildDTO planPostDto, String user_id) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
-        String[] dateArr = planPostDto.getPost_date().split("-");
 
         PlanChild planPost = PlanChild.builder()
                 .user_id(user_id)
@@ -46,9 +45,9 @@ public class PlanChildService {
                 .memo(planPostDto.getMemo())
                 .category_id(planPostDto.getCategory_id())
                 .title(planPostDto.getTitle())
-                .post_year(dateArr[0])
-                .post_month(dateArr[1])
-                .post_date(dateArr[2])
+                .post_year(planPostDto.getPost_year())
+                .post_month(planPostDto.getPost_month())
+                .post_day(planPostDto.getPost_day())
                 .plan_start_time(planPostDto.getPlan_start_time())
                 .plan_end_time(planPostDto.getPlan_end_time())
                 .is_completed(planPostDto.is_completed())
@@ -104,7 +103,7 @@ public class PlanChildService {
                             .id(plan.getId())
                             .user_id(plan.getUser_id())
                             .title(plan.getTitle())
-                            .post_date(targetDate)
+                            .post_day(targetDate)
                             .plan_start_time(start_time)
                             .is_completed(plan.is_completed())
                             .build();
