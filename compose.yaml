@@ -2,7 +2,7 @@ services:
   app:
     image: zyerin/iplan1
     ports:
-      - "8080:8080"
+      - "8083:8080"
     environment:
       - FIREBASE_CONFIG_PATH=/app/iplan-firebase.json
 
@@ -18,6 +18,8 @@ services:
   app3:
     image: hanni/test1
     ports:
-      - "8080:8080"
+      - "8082:8080"
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=./src/main/resources/iplan-3e9c2-feef2236cd5b.json
     volumes:
       - ./src/main/resources/iplan-firebase.json:/app/iplan-firebase.json
