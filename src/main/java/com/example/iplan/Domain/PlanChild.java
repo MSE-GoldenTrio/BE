@@ -48,7 +48,7 @@ public class PlanChild {
 
     @JsonFormat(pattern = "dd")
     @Schema(description = "계획이 추가된 날짜의 일", example = "22", requiredMode = Schema.RequiredMode.REQUIRED)
-    private String post_date;
+    private String post_day;
 
     @JsonFormat(pattern = "HH:mm")
     @Schema(description = "계획 시작 시간", example = "14:00")

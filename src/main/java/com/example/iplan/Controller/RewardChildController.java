@@ -43,10 +43,10 @@ public class RewardChildController {
      * @throws InterruptedException
      */
     @Operation(summary = "보상 추가 POST", description = "받고 싶은 보상을 입력(추가)한다.",
-    requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            content = {
-                    @Content(schema = @Schema(implementation = RewardChildDTO.class))
-            }))
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = {
+                            @Content(schema = @Schema(implementation = RewardChildDTO.class))
+                    }))
     @PostMapping
     @ResponseBody
     public ResponseEntity<Map<String, Object>> saveReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
@@ -74,8 +74,74 @@ public class RewardChildController {
     }
 
     /**
+     * 특정 날짜의 보상을 가져옴
+     * @param year 해당 연도
+     * @param month 해당 월 (1월은 1, 12월은 12)
+     * @param day 해당 일 (01, 02, ..., 31)
+     * @return 해당 날짜의 보상 정보
+     */
+    @Operation(summary = "특정 날짜의 보상 GET", description = "특정 날짜의 보상을 가져온다.")
+    @GetMapping("/daily-reward")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getDailyReward(
+            @RequestParam int year,
+            @RequestParam int month,
+            @RequestParam int day,
+            @AuthenticationPrincipal String nickname) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            RewardChildDTO reward = rewardChildService.getDailyReward(nickname, year, month, day);
+
+            if (reward != null) {
+                response.put("success", true);
+                response.put("reward", reward);
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("success", false);
+                response.put("message", "해당 날짜에 대한 보상이 존재하지 않습니다.");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        } catch (ExecutionException | InterruptedException e) {
+            response.put("success", false);
+            response.put("message", "보상 데이터를 가져오는 데 실패했습니다. Error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * 사용자의 모든 보상을 조회
+     * @param nickname 사용자 이름 (AuthenticationPrincipal로 인증된 사용자)
+     * @return 모든 보상 목록
+     */
+    @Operation(summary = "모든 보상 목록 GET", description = "해당 사용자의 모든 보상 목록을 조회한다.")
+    @GetMapping("/all-rewards")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getAllRewards(@AuthenticationPrincipal String nickname) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<RewardChildDTO> rewards = rewardChildService.getAllRewards(nickname);
+
+            if (rewards.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "보상 목록이 존재하지 않습니다.");
+            } else {
+                response.put("success", true);
+                response.put("rewards", rewards);
+            }
+
+            return ResponseEntity.ok(response);
+        } catch (ExecutionException | InterruptedException e) {
+            response.put("success", false);
+            response.put("message", "보상 목록을 가져오는 데 실패했습니다. Error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+
+    /**
      * 보상을 수정
-     * @param reward 수정할 Reward 객체
+     * @param rewardDto 수정할 Reward 객체
      * @return 성공 여부 및 오류 메시지
      * @throws ExecutionException
      * @throws InterruptedException
@@ -85,10 +151,11 @@ public class RewardChildController {
                     content = {
                             @Content(schema = @Schema(implementation = RewardChildDTO.class))
                     }))
-    @PatchMapping()
+    @PatchMapping("/update")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> updateReward(@AuthenticationPrincipal String user_id, @RequestBody @NotNull RewardChildDTO reward) throws ExecutionException, InterruptedException {
-        return rewardChildService.updateReward(user_id, reward);
+    public ResponseEntity<Map<String, Object>> updateReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
+        log.info("Received RewardChildDTO for update reward: {}, AuthenticationPrincipal email: {}", rewardDto, nickname);
+        return rewardChildService.updateReward(rewardDto, nickname);
     }
 
     /**

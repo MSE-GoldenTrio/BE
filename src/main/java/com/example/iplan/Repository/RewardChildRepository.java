@@ -57,8 +57,8 @@ public class RewardChildRepository extends DefaultFirebaseDBRepository<RewardChi
 
         Map<String, Object> filters = Map.of(
                 "user_id", userId,
-                "year", splitResult[0],
-                "month", splitResult[1]);
+                "post_year", splitResult[0],
+                "post_month", splitResult[1]);
 
 
         return findAllByFields(filters);
@@ -76,9 +76,9 @@ public class RewardChildRepository extends DefaultFirebaseDBRepository<RewardChi
 
         Map<String, Object> filters = Map.of(
                 "user_id", userId,
-                "year", splitResult[0],
-                "month", splitResult[1],
-                "day", splitResult[2]);
+                "post_year", splitResult[0],
+                "post_month", splitResult[1],
+                "post_day", splitResult[2]);
 
         return findByFields(filters);
     }
@@ -105,7 +105,10 @@ public class RewardChildRepository extends DefaultFirebaseDBRepository<RewardChi
                 .id(rewardChild.getId())
                 .user_id(rewardChild.getUser_id())
                 .content(rewardChild.getContent())
-                .date(rewardChild.getDate())
+                .post_date(rewardChild.getPost_date())
+                .post_year(rewardChild.getPost_year())
+                .post_month(rewardChild.getPost_month())
+                .post_day(rewardChild.getPost_day())
                 .rewarded(rewardChild.isRewarded())
                 .build();
     }
