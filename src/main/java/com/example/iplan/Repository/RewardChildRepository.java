@@ -110,6 +110,7 @@ public class RewardChildRepository extends DefaultFirebaseDBRepository<RewardChi
                 .post_month(rewardChild.getPost_month())
                 .post_day(rewardChild.getPost_day())
                 .rewarded(rewardChild.isRewarded())
+                .success(rewardChild.isSuccess())
                 .build();
     }
 }
