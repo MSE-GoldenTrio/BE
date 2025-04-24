@@ -5,7 +5,9 @@ import com.example.iplan.Domain.ScreenTimeOCRResult;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.GetScreenTimeOCRRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
+import com.example.iplan.util.SimplePair;
 import com.google.cloud.vision.v1.*;
+import com.google.cloud.vision.v1.Image;
 import com.google.protobuf.ByteString;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.awt.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +25,7 @@ import java.nio.file.attribute.FileTime;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,6 +56,8 @@ public class ScreenTimeService {
         response.put("entity", result);
         response.put("success", true);
 
+        System.out.println("isSuccess?: " + result.isSuccess());
+
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
@@ -72,6 +78,7 @@ public class ScreenTimeService {
         String deadlineTime = result.getDeadLineTime();
         String goalTime = result.getGoalTime();
 
+        response.put("date", targetDate);
         response.put("deadLineTime", deadlineTime);
         response.put("goalTime", goalTime);
         response.put("success", true);
@@ -127,7 +134,7 @@ public class ScreenTimeService {
                     Map<String, Object> filteredTexts = filterExtractedTexts(extractedTexts);
 
                     // 해당 날짜에 설정해둔 목표 시간에 달성했을 때, 결과물을 담아서 보낸다.
-                    boolean screenTimeGoalResult = IsAchieveUsingTime(user_id, filteredTexts, response);
+                    boolean screenTimeGoalResult = IsAchieveUsingTime(user_id, filteredTexts);
 
                     // 현재 날짜
                     LocalDate today = LocalDate.now();
@@ -143,6 +150,7 @@ public class ScreenTimeService {
                             .build();
 
                     getScreenTimeOCRRepository.save(result);
+                    response.put("entity", filteredTexts);
                     System.out.println("OCR 결과 저장 완료.");
 
                 } catch (Exception e) {
@@ -184,7 +192,7 @@ public class ScreenTimeService {
     private List<String> extractTextFromImage(Path imagePath) throws IOException {
         ByteString imgBytes = ByteString.readFrom(Files.newInputStream(imagePath));
         Image img = Image.newBuilder().setContent(imgBytes).build();
-        Feature feat = Feature.newBuilder().setType(Feature.Type.DOCUMENT_TEXT_DETECTION).build();
+        Feature feat = Feature.newBuilder().setType(Feature.Type.TEXT_DETECTION).build();
         AnnotateImageRequest request = AnnotateImageRequest.newBuilder().addFeatures(feat).setImage(img).build();
 
         try (ImageAnnotatorClient client = ImageAnnotatorClient.create()) {
@@ -197,72 +205,51 @@ public class ScreenTimeService {
             }
 
             List<EntityAnnotation> annotations = response.getTextAnnotationsList();
-            List<String> lines = Arrays.stream((annotations.get(0).getDescription().split("\n"))).toList();
+            if (annotations.size() < 2) return List.of();
 
-/*            System.out.println("==========get(0) 전체 텍스트 출력=========");
-            lines.forEach(System.out::println);
-            System.out.println("==========개별 텍스트 출력=========");
-            annotations.subList(1, annotations.size())
-                    .forEach(annotation -> System.out.println(annotation.getDescription()));*/
+            List<String> lines = Arrays.stream(annotations.get(0).getDescription().split("\n")).toList();
 
-            Map<String, Vertex> testMap = new LinkedHashMap<>();
+            List<SimplePair<String, Point>> textWithPositions = new ArrayList<>();
 
             int index = 1;
-
             for (String line : lines) {
                 int j = index;
                 String sumText = annotations.get(j).getDescription();
+                List<Vertex> allVertices = new ArrayList<>(annotations.get(j).getBoundingPoly().getVerticesList());
 
                 while (j + 1 < annotations.size() && !line.replaceAll("\\s+", "").equals(sumText)) {
-                    sumText += annotations.get(++j).getDescription();
+                    j++;
+                    sumText += annotations.get(j).getDescription();
+                    allVertices.addAll(annotations.get(j).getBoundingPoly().getVerticesList());
                 }
 
-                testMap.put(line, annotations.get(index).getBoundingPoly().getVerticesList().get(0));
+                int centerX = (int) allVertices.stream().mapToInt(Vertex::getX).average().orElse(0);
+                int centerY = (int) allVertices.stream().mapToInt(Vertex::getY).average().orElse(0);
+
+                textWithPositions.add(new SimplePair<>(line, new Point(centerX, centerY)));
                 index = j + 1;
             }
 
-            //testMap.forEach((key, value) -> System.out.println(key + " = " + value));
+            textWithPositions.sort((p1, p2) -> {
+                Point pt1 = p1.getRight();
+                Point pt2 = p2.getRight();
+                if (Math.abs(pt1.y - pt2.y) > 20) return Integer.compare(pt1.y, pt2.y);
+                return Integer.compare(pt1.x, pt2.x);
+            });
 
-            // 0번은 전체 텍스트이므로 제외하고 1번부터 개별 텍스트만 사용
-/*            Map<String, Vertex> arrangedTextMap = new LinkedHashMap<>();
-
-            for (int i = 1; i < annotations.size(); i++) {
-                EntityAnnotation annotation = annotations.get(i);
-                String text = annotation.getDescription();
-                Vertex vertex = annotation.getBoundingPoly().getVertices(0);  // 좌측 상단 좌표
-
-                arrangedTextMap.put(text, vertex);
-            }*/
-
-            // Y → X 순 정렬
-            List<Map.Entry<String, Vertex>> sortedEntries = testMap.entrySet()
-                    .stream()
-                    .sorted((e1, e2) -> {
-                        Vertex v1 = e1.getValue();
-                        Vertex v2 = e2.getValue();
-
-                        // 줄간 오차 허용
-                        if (Math.abs(v1.getY() - v2.getY()) > 15) {
-                            return Integer.compare(v1.getY(), v2.getY());
-                        }
-                        return Integer.compare(v1.getX(), v2.getX());
-                    })
+            List<String> sortedTexts = textWithPositions.stream()
+                    .map(SimplePair::getLeft)
                     .toList();
 
-            // 텍스트만 리스트로 추출
-            List<String> sortedExtractText = new ArrayList<>();
-            for (Map.Entry<String, Vertex> entry : sortedEntries) {
-                sortedExtractText.add(entry.getKey());
-            }
-
-            return sortedExtractText;
+            System.out.println("=========== 최종 정렬된 텍스트 ===========");
+            sortedTexts.forEach(t -> System.out.println("text: " + t));
+            return sortedTexts;
 
         } catch (Exception e) {
             System.out.println("OCR 처리 중 예외 발생: " + (e.getMessage() != null ? e.getMessage() : "메시지 없음"));
             throw new CustomException("OCR 처리 중 오류가 발생했습니다.", HttpStatus.BAD_REQUEST);
         }
     }
-
 
     private Map<String, Object> filterExtractedTexts(List<String> extractedTexts){
         Map<String, Object> result = new HashMap<>();
@@ -310,14 +297,16 @@ public class ScreenTimeService {
                 boolean minMatch = MinMatcher.matches();
                 if(fullTimeMatch || minMatch){
                     String subtime = fullTimeMatch ? TimeFormatter(MatcherFullTime) : TimeFormatter(MinMatcher);
-                    Map<String, String> categoryTime = categories.get(categories.size() - 1);
+                    Map<String, String> categoryTime = categories.get(timeCount - 1);
                     categoryTime.put("time", subtime);
 
                     timeCount++;
                 }else{
-                    Map<String, String> category = new HashMap<>();
-                    category.put("name", text);
-                    categories.add(category);
+                    if (text.length() > 1 && text.matches(".*[가-힣a-zA-Z0-9].*")) {
+                        Map<String, String> category = new HashMap<>();
+                        category.put("name", text);
+                        categories.add(category);
+                    }
                 }
             }
         }
@@ -344,7 +333,7 @@ public class ScreenTimeService {
         return fileCreationDate.equals(LocalDate.now().toString()) && LocalTime.parse(fileCreationTime).isAfter(LocalTime.parse(deadLineTime));
     }
 
-    private boolean IsAchieveUsingTime(String user_id, Map<String, Object> filteredTexts, Map<String, Object> response) throws ExecutionException, InterruptedException {
+    private boolean IsAchieveUsingTime(String user_id, Map<String, Object> filteredTexts) throws ExecutionException, InterruptedException {
         LocalTime mainTime = LocalTime.parse(filteredTexts.get("mainTime").toString(), DateTimeFormatter.ofPattern("HH:mm"));
         Duration mainTimeDuration = Duration.between(LocalTime.MIDNIGHT, mainTime);
 
@@ -352,16 +341,7 @@ public class ScreenTimeService {
         LocalTime goalTime = LocalTime.parse(goalTimeString, DateTimeFormatter.ofPattern("HH:mm"));
         Duration goalTimeDuration = Duration.between(LocalTime.MIDNIGHT, goalTime);
 
-        if(mainTimeDuration.compareTo(goalTimeDuration) < 0){
-            response.put("entity", filteredTexts);
-            response.put("success", true);
-            response.put("message", "목표 시간 달성에 성공하였습니다.");
-            return true;
-        }else{
-            response.put("success", false);
-            response.put("message", "목표 시간 달성에 실패하였습니다.");
-            return false;
-        }
+        return mainTimeDuration.compareTo(goalTimeDuration) < 0;
     }
 
     private String DateFormatter(Matcher dateMatcher){
