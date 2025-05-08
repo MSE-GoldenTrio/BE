@@ -41,6 +41,7 @@ public class JwtTokenProvider {
         CustomOAuth2UserDetails userDetails = (CustomOAuth2UserDetails) authentication.getPrincipal();
 
         String nickname = userDetails.getUser().getNickname();
+        String linked_id = userDetails.getUser().getLinked_id();
 
         // 사용자 권한 리스트 추출 (ROLE_CHILD, ROLE_PARENT → CHILD, PARENT 변환)
         // authentication.getAuthorities()에서 GrantedAuthority의 getAuthority()를 호출하여 문자열(ROLE_CHILD, ROLE_PARENT)을 가져옴
@@ -52,7 +53,7 @@ public class JwtTokenProvider {
         // 이때, 문자열이 아니라 Enum 값(CHILD, PARENT)을 저장하려면 UserRole.fromString()을 사용해 변환
         UserRole role = UserRole.fromString(roleString); // 문자열을 Enum(UserRole)로 변환
 
-        log.info("User nickname: {}, role: {}", nickname, role);
+        log.info("User nickname: {}, role: {}, linked_id: {}", nickname, role, linked_id);
 
         long now = (new Date()).getTime();
 
@@ -61,6 +62,7 @@ public class JwtTokenProvider {
         String accessToken = Jwts.builder()
                 .setSubject(nickname)
                 .claim("role", role.name()) // Enum 값 저장 (CHILD, PARENT)
+                .claim("linked_id", linked_id)
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
@@ -86,6 +88,9 @@ public class JwtTokenProvider {
         log.info("[JwtTokenProvider getAuthentication]");
         log.info("claim.getSubject is 'Nickname' = {}", claims.getSubject());
 
+        String nickname = claims.getSubject();
+        String linked_id = claims.get("linked_id", String.class);
+
         // role 정보가 없는 경우 예외 처리
         if (claims.get("role") == null) {
             throw new RuntimeException("JWT에 role 정보가 없습니다.");
@@ -105,18 +110,19 @@ public class JwtTokenProvider {
                 Users.builder()
                         .name("")
                         .email("")
-                        .nickname(claims.getSubject())  // 토큰에서 추출한..
+                        .nickname(nickname)  // 토큰에서 추출한..
                         .password("")
                         .authority(role)    // Enum 값 그대로 사용
+                        .linked_id(linked_id)
                         .build()
         );
 
         // Spring Security에서 UsernamePasswordAuthenticationToken을 생성할 때 첫 번째 매개변수는 Principal(사용자 정보) 역할을 함
         // -> principal 대신 nickname을 매개변수로 넣어서 @AuthenticationPrincipal에서 바로 nickname 가져올 수 있도록 함!!
-        String nickname = claims.getSubject();
 
-        // 기존에는 UsernamePasswordAuthenticationToken(principal, "", authorities)
-        return new UsernamePasswordAuthenticationToken(nickname, "", authorities);
+//        String nickname = claims.getSubject();
+//        return new UsernamePasswordAuthenticationToken(nickname, "", authorities);
+        return new UsernamePasswordAuthenticationToken(principal, "", authorities);
     }
 
     // JWT 유효성 검증
