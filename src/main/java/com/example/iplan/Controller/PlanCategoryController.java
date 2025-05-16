@@ -2,6 +2,7 @@ package com.example.iplan.Controller;
 
 import com.example.iplan.DTO.PlanCategoryDTO;
 import com.example.iplan.Service.PlanCategoryService;
+import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.google.firebase.database.annotations.NotNull;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,15 +30,17 @@ public class PlanCategoryController {
     })
     @PostMapping("/addition/{categoryName}")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> additionPlanCategory(@PathVariable @Parameter(description = "추가하고싶은 카테고리 이름", example = "숙제") String categoryName, @AuthenticationPrincipal String userId){
-        return planCategoryService.addCategory(userId, categoryName);
+    public ResponseEntity<Map<String, Object>> additionPlanCategory(@PathVariable @Parameter(description = "추가하고싶은 카테고리 이름", example = "숙제") String categoryName, @AuthenticationPrincipal CustomOAuth2UserDetails user){
+        String nickname = user.getUsername();
+        return planCategoryService.addCategory(nickname, categoryName);
     }
 
     @Operation(summary = "카테고리 GET", description = "사용자가 추가한 카테고리를 모두 보여준다.")
     @GetMapping("/categoryList/")
     @ResponseBody
-    public List<PlanCategoryDTO> findAllUserCategory(@AuthenticationPrincipal String userId) throws ExecutionException, InterruptedException {
-        return planCategoryService.findAllPlanCategory(userId);
+    public List<PlanCategoryDTO> findAllUserCategory(@AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+        String nickname = user.getUsername();
+        return planCategoryService.findAllPlanCategory(nickname);
     }
 
     @Operation(summary = "카테고리 삭제", parameters = {

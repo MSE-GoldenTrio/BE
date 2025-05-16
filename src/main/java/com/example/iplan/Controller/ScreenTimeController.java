@@ -1,6 +1,7 @@
 package com.example.iplan.Controller;
 
 import com.example.iplan.Service.ScreenTimeService;
+import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,8 +21,9 @@ public class ScreenTimeController {
     private final ScreenTimeService screenTimeService;
 
     @PostMapping("/upload")
-    public ResponseEntity<Map<String, Object>> uploadScreenTimeFile(@RequestParam("image")MultipartFile image, @AuthenticationPrincipal String user_id) throws IOException, ExecutionException, InterruptedException {
-        return screenTimeService.uploadScreenTimeImage(image, user_id);
+    public ResponseEntity<Map<String, Object>> uploadScreenTimeFile(@RequestParam("image")MultipartFile image, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws IOException, ExecutionException, InterruptedException {
+        String childNickname = user.getUsername();
+        return screenTimeService.uploadScreenTimeImage(image, childNickname);
     }
 
     @GetMapping("/showTimeSet/{targetDate}")
