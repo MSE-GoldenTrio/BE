@@ -49,10 +49,12 @@ public class RewardChildController {
                     }))
     @PostMapping
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> saveReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
-        log.info("Received RewardChildDTO: {}, AuthenticationPrincipal email: {}", rewardDto, nickname);
+    public ResponseEntity<Map<String, Object>> saveReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
 
-        return rewardChildService.saveReward(rewardDto, nickname);
+        String childNickname = user.getUsername();
+        log.info("Received RewardChildDTO: {}, AuthenticationPrincipal email: {}", rewardDto, childNickname);
+
+        return rewardChildService.saveReward(rewardDto, childNickname);
     }
 
     /**
@@ -87,10 +89,11 @@ public class RewardChildController {
             @RequestParam int year,
             @RequestParam int month,
             @RequestParam int day,
-            @AuthenticationPrincipal String nickname) {
+            @AuthenticationPrincipal CustomOAuth2UserDetails user) {
 
         Map<String, Object> response = new HashMap<>();
         try {
+            String nickname = user.getUsername();
             RewardChildDTO reward = rewardChildService.getDailyReward(nickname, year, month, day);
 
             if (reward != null) {
@@ -111,15 +114,16 @@ public class RewardChildController {
 
     /**
      * 사용자의 모든 보상을 조회
-     * @param nickname 사용자 이름 (AuthenticationPrincipal로 인증된 사용자)
+     * @param user
      * @return 모든 보상 목록
      */
     @Operation(summary = "모든 보상 목록 GET", description = "해당 사용자의 모든 보상 목록을 조회한다.")
     @GetMapping("/all-rewards")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> getAllRewards(@AuthenticationPrincipal String nickname) {
+    public ResponseEntity<Map<String, Object>> getAllRewards(@AuthenticationPrincipal CustomOAuth2UserDetails user) {
         Map<String, Object> response = new HashMap<>();
         try {
+            String nickname = user.getUsername();
             List<RewardChildDTO> rewards = rewardChildService.getAllRewards(nickname);
 
             if (rewards.isEmpty()) {
@@ -153,9 +157,10 @@ public class RewardChildController {
                     }))
     @PatchMapping("/update")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> updateReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
-        log.info("Received RewardChildDTO for update reward: {}, AuthenticationPrincipal email: {}", rewardDto, nickname);
-        return rewardChildService.updateReward(rewardDto, nickname);
+    public ResponseEntity<Map<String, Object>> updateReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+        String childNickname = user.getUsername();
+        log.info("Received RewardChildDTO for update reward: {}, AuthenticationPrincipal email: {}", rewardDto, childNickname);
+        return rewardChildService.updateReward(rewardDto, childNickname);
     }
 
     /**

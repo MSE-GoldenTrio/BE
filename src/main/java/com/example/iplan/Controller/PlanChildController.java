@@ -3,6 +3,7 @@ package com.example.iplan.Controller;
 import com.example.iplan.DTO.PlanChildDTO;
 import com.example.iplan.DTO.ScreenTimeDTO;
 import com.example.iplan.Service.PlanChildService;
+import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.google.firebase.database.annotations.NotNull;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,7 +38,7 @@ public class PlanChildController {
     /**
      * (목표 탭에서 계획 추가하기 버튼 클릭시) 해당 날짜에 단일 계획을 추가한다
      * @param request PlanChildDto
-     * @param nickname 유저 아이디
+     * @param user 인증객체
      * @return 성공 여부 및 오류 메세지
      * @throws ExecutionException
      * @throws InterruptedException
@@ -48,10 +49,12 @@ public class PlanChildController {
     })
     @PostMapping("/addition")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> additionPlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal String nickname)
+    public ResponseEntity<Map<String, Object>> additionPlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal CustomOAuth2UserDetails user)
             throws ExecutionException, InterruptedException {
         log.info("Child plan addition API received!");
-        return planChildService.postChildNewPlan(request, nickname);
+
+        String childNickname = user.getUsername();
+        return planChildService.postChildNewPlan(request, childNickname);
     }
 
     /**
@@ -66,16 +69,16 @@ public class PlanChildController {
             })
     @GetMapping("/dayPlanListTitle/{targetDate}")
     public ResponseEntity<Map<String, Object>> showPlanList
-    (@AuthenticationPrincipal String uid,
+    (@AuthenticationPrincipal CustomOAuth2UserDetails user,
      @PathVariable @Parameter(description = "원하는 년/월/일", example = "2025-01-15") String targetDate) throws ExecutionException, InterruptedException {
-
-        Map<String, Object> response = planChildService.findAllPlanList(uid, targetDate);
+        String childNickname = user.getUsername();
+        Map<String, Object> response = planChildService.findAllPlanList(childNickname, targetDate);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     /**
      * 사용자의 전체 계획 목록 반환(날짜 상관 없음)
-     * @param nickname
+     * @param user
      * @return
      * @throws ExecutionException
      * @throws InterruptedException
@@ -83,8 +86,8 @@ public class PlanChildController {
     @Operation(summary = "계획 목록 조회 GET", description = "해당 사용자의 전체 계획 목록을 가져온다.")
     @GetMapping("/list")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> getPlanList(@AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
-
+    public ResponseEntity<Map<String, Object>> getPlanList(@AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+        String nickname = user.getUsername();
         Map<String, Object> response = planChildService.getAllPlans(nickname);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
@@ -109,7 +112,7 @@ public class PlanChildController {
     /**
      * 특정 계획 수정
      * @param request
-     * @param nickname
+     * @param user
      * @return
      * @throws ExecutionException
      * @throws InterruptedException
@@ -117,9 +120,10 @@ public class PlanChildController {
     @Operation(summary = "단일 계획 업데이트 UPDATE", description = "특정 계획 데이터 값을 바꾼다.(계획 달성 체크의 경우도 해당), Id 필수")
     @PatchMapping("/update-plan")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> updatePlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal String nickname) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updatePlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
         log.info("Child's plan 'is_completed' update");
-        return planChildService.updateOriginalPlan(request, nickname);
+        String childNickname = user.getUsername();
+        return planChildService.updateOriginalPlan(request, childNickname);
     }
 
     /**
@@ -147,7 +151,8 @@ public class PlanChildController {
     @Operation(summary = "스크린 타임 목표 설정", description = "목표 탭에서 스크린 타임 측정 클릭시 목표 시간 설정")
     @PostMapping("/screen-time-set")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> setScreenTime(@RequestBody ScreenTimeDTO screenTime, @AuthenticationPrincipal String uid){
-        return planChildService.SetScreenTime(screenTime, uid);
+    public ResponseEntity<Map<String, Object>> setScreenTime(@RequestBody ScreenTimeDTO screenTime, @AuthenticationPrincipal CustomOAuth2UserDetails user){
+        String childNickname = user.getUsername();
+        return planChildService.SetScreenTime(screenTime, childNickname);
     }
 }

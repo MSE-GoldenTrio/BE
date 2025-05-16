@@ -51,9 +51,10 @@ public class AccountController {
 
     @GetMapping("/child/pending-requests")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> getChildPendingRequests(@AuthenticationPrincipal String childNickname) {
+    public ResponseEntity<Map<String, Object>> getChildPendingRequests(@AuthenticationPrincipal CustomOAuth2UserDetails user) {
         Map<String, Object> response = new HashMap<>();
         try {
+            String childNickname = user.getUsername();
             List<AccountRequestDTO> requests = accountService.getPendingRequestsForChild(childNickname);
 
             if (requests.isEmpty()) {

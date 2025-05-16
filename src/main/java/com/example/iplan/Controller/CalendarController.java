@@ -2,6 +2,7 @@ package com.example.iplan.Controller;
 
 import com.example.iplan.Domain.DayData;
 import com.example.iplan.Service.CalendarService;
+import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -32,7 +33,7 @@ public class CalendarController {
     /**
      * (달력 탭) 해당 년월의 도장(성공)상황 모두 가져오기
      * @param yearMonth
-     * @param userId
+     * @param user
      * @return
      * @throws ExecutionException
      * @throws InterruptedException
@@ -43,16 +44,17 @@ public class CalendarController {
             })
     @GetMapping("/{yearMonth}")
     public ResponseEntity<Map<String, Object>> getMonthCalendarData
-    (@PathVariable @Parameter(description = "원하는 년/월", example = "2025-01") String yearMonth, @AuthenticationPrincipal String userId) {
+    (@PathVariable @Parameter(description = "원하는 년/월", example = "2025-01") String yearMonth, @AuthenticationPrincipal CustomOAuth2UserDetails user) {
 
-        return calendarService.getAllCalendarData(yearMonth, userId);
+        String nickname = user.getUsername();
+        return calendarService.getAllCalendarData(yearMonth, nickname);
 
     }
 
     /**
      * (달력 탭) 특정 날짜 클릭시 해당 날짜의 데이터 모두 가져오기
      * @param yearMonthDate
-     * @param userId
+     * @param user
      * @return
      * @throws ExecutionException
      * @throws InterruptedException
@@ -66,7 +68,9 @@ public class CalendarController {
     })
     @GetMapping("/showTargetDateData/{yearMonthDate}")
     public ResponseEntity<Map<String, Object>> getTargetDateData
-    (@PathVariable @Parameter(description = "원하는 년/월/일", example = "2025-01-22") String yearMonthDate, @AuthenticationPrincipal String userId) throws ExecutionException, InterruptedException {
-        return calendarService.getTargetDateData(yearMonthDate, userId);
+    (@PathVariable @Parameter(description = "원하는 년/월/일", example = "2025-01-22") String yearMonthDate, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+
+        String nickname = user.getUsername();
+        return calendarService.getTargetDateData(yearMonthDate, nickname);
     }
 }
