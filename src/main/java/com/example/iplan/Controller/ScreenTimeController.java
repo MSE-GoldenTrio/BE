@@ -27,13 +27,15 @@ public class ScreenTimeController {
     }
 
     @GetMapping("/showTimeSet/{targetDate}")
-    public ResponseEntity<Map<String, Object>> GetScreenTime(@AuthenticationPrincipal String user_id, @PathVariable String targetDate) throws ExecutionException, InterruptedException{
-        return screenTimeService.getScreenTime(user_id, targetDate);
+    public ResponseEntity<Map<String, Object>> GetScreenTime(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String targetDate) throws ExecutionException, InterruptedException{
+        String childNickname = user.getUsername();
+        return screenTimeService.getScreenTime(childNickname, targetDate);
     }
 
     @GetMapping("/showScreenTimeGraph/{targetDate}")
-    public ResponseEntity<Map<String, Object>> GetScreenTimeGraph(@AuthenticationPrincipal String user_id, @PathVariable String targetDate) throws ExecutionException, InterruptedException{
-        return screenTimeService.getScreenTimeGraph(user_id, targetDate);
+    public ResponseEntity<Map<String, Object>> GetScreenTimeGraph(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String targetDate) throws ExecutionException, InterruptedException{
+        String childNickname = user.getUsername();
+        return screenTimeService.getScreenTimeGraph(childNickname, targetDate);
     }
 
 }
