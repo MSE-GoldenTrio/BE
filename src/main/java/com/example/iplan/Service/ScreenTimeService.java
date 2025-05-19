@@ -1,9 +1,11 @@
 package com.example.iplan.Service;
 
+import com.example.iplan.Domain.InstalledApps;
 import com.example.iplan.Domain.ScreenTime;
 import com.example.iplan.Domain.ScreenTimeOCRResult;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.GetScreenTimeOCRRepository;
+import com.example.iplan.Repository.InstalledAppsRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
 import com.example.iplan.util.SimplePair;
 import com.google.cloud.vision.v1.*;
@@ -39,6 +41,8 @@ public class ScreenTimeService {
     private final SetScreenTimeRepository setScreenTimeRepository;
 
     private final GetScreenTimeOCRRepository getScreenTimeOCRRepository;
+
+    private final InstalledAppsRepository installedAppsRepository;
 
     public ResponseEntity<Map<String, Object>> getScreenTimeGraph(String user_id, String targetDate) throws ExecutionException, InterruptedException{
         Map<String, Object> response = new HashMap<>();
@@ -87,88 +91,108 @@ public class ScreenTimeService {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    public ResponseEntity<Map<String, Object>> uploadScreenTimeImage(@RequestParam("file") MultipartFile image, String user_id) throws IOException, ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> uploadScreenTimeImage(@RequestParam("file") MultipartFile image, String user_id, List<String> installedApps) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
+        InstalledApps savedInstalledApps = installedAppsRepository.findByUserId(user_id);
 
         if(user_id == null){
             throw new CustomException("유저 상태를 확인해주세요.", HttpStatus.BAD_REQUEST);
         }
 
-        try {
-            // 1. 임시 파일로 저장
-            String filename = image.getOriginalFilename();
-            if (filename == null || filename.isEmpty()) {
-                throw new CustomException("파일 이름이 비어 있습니다.", HttpStatus.BAD_REQUEST);
-            }
+        if(installedApps != null){
+            System.out.println("설치된 어플 목록을 프론트로부터 새로 받았습니다.");
+            InstalledApps newInstalledApps = InstalledApps.builder()
+                    .user_id(user_id)
+                    .installed_apps(installedApps).build();
 
-            Path tempDir = Files.createTempDirectory("upload");
-            System.out.println("Temporary directory created: " + tempDir);
-
-            Path filePath = tempDir.resolve(filename);
-            System.out.println("File will be saved at: " + filePath);
-
-            // 파일 저장
-            try {
-                Files.write(filePath, image.getBytes());
-                System.out.println("File written successfully to: " + filePath);
-            } catch (IOException e) {
-                throw new CustomException("파일 저장 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-
-            // 2. 파일 생성 시간 확인(캡쳐 시간 확인)
-            BasicFileAttributes attr = Files.readAttributes(filePath, BasicFileAttributes.class);
-            FileTime creationTime = attr.creationTime();
-            LocalDateTime creationDateTime = creationTime
-                    .toInstant()
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDateTime();
-
-            System.out.println("파일 생성 시간: " + creationDateTime);
-
-            // 파일 생성 날짜가 오늘이고, 마감 시간을 넘겼을 경우에만 OCR 수행
-            if (IsInValidScreenShot(user_id, creationDateTime)) {
-                try {
-                    // 3. Google Vision API를 사용하여 OCR 수행
-                    List<String> extractedTexts = extractTextFromImage(filePath);
-
-                    // 커스텀 필터를 통해 필요한 텍스트만 추출
-                    Map<String, Object> filteredTexts = filterExtractedTexts(extractedTexts);
-
-                    // 해당 날짜에 설정해둔 목표 시간에 달성했을 때, 결과물을 담아서 보낸다.
-                    boolean screenTimeGoalResult = IsAchieveUsingTime(user_id, filteredTexts);
-
-                    // 현재 날짜
-                    LocalDate today = LocalDate.now();
-                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                    String todayToString = today.format(formatter);
-
-                    // OCR 결과 저장
-                    ScreenTimeOCRResult result = ScreenTimeOCRResult.builder()
-                            .user_id(user_id)
-                            .date(todayToString)
-                            .result(filteredTexts)
-                            .isSuccess(screenTimeGoalResult)
-                            .build();
-
-                    getScreenTimeOCRRepository.save(result);
-                    response.put("entity", filteredTexts);
-                    System.out.println("OCR 결과 저장 완료.");
-
-                } catch (Exception e) {
-                    DeleteFolderFiles(filePath);
-                    throw new CustomException(e.getMessage(), HttpStatus.BAD_REQUEST);
-                }
+            if(savedInstalledApps == null){
+                installedAppsRepository.save(newInstalledApps);
             } else {
-                DeleteFolderFiles(filePath);
-                throw new CustomException("파일 생성 시간이 유효하지 않습니다.", HttpStatus.BAD_REQUEST);
+                installedAppsRepository.update(newInstalledApps);
             }
+            savedInstalledApps = newInstalledApps;
+        }
 
-            // 마지막에 임시 파일 삭제
-            DeleteFolderFiles(filePath);
-            return new ResponseEntity<>(response, HttpStatus.OK);
+        if(savedInstalledApps != null){
+            try {
+                // 1. 임시 파일로 저장
+                String filename = image.getOriginalFilename();
+                if (filename == null || filename.isEmpty()) {
+                    throw new CustomException("파일 이름이 비어 있습니다.", HttpStatus.BAD_REQUEST);
+                }
 
-        } catch (Exception e) {
-            throw new CustomException("파일 업로드 오류 발생: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+                Path tempDir = Files.createTempDirectory("upload");
+                System.out.println("Temporary directory created: " + tempDir);
+
+                Path filePath = tempDir.resolve(filename);
+                System.out.println("File will be saved at: " + filePath);
+
+                // 파일 저장
+                try {
+                    Files.write(filePath, image.getBytes());
+                    System.out.println("File written successfully to: " + filePath);
+                } catch (IOException e) {
+                    throw new CustomException("파일 저장 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+
+                // 2. 파일 생성 시간 확인(캡쳐 시간 확인)
+                BasicFileAttributes attr = Files.readAttributes(filePath, BasicFileAttributes.class);
+                FileTime creationTime = attr.creationTime();
+                LocalDateTime creationDateTime = creationTime
+                        .toInstant()
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDateTime();
+
+                System.out.println("파일 생성 시간: " + creationDateTime);
+
+                // 파일 생성 날짜가 오늘이고, 마감 시간을 넘겼을 경우에만 OCR 수행
+                if (IsInValidScreenShot(user_id, creationDateTime)) {
+                    try {
+                        // 3. Google Vision API를 사용하여 OCR 수행
+                        List<String> extractedTexts = extractTextFromImage(filePath);
+
+                        // 커스텀 필터를 통해 필요한 텍스트만 추출
+                        Map<String, Object> filteredTexts = filterExtractedTexts(extractedTexts, savedInstalledApps.getInstalled_apps());
+
+                        // 해당 날짜에 설정해둔 목표 시간에 달성했을 때, 결과물을 담아서 보낸다.
+                        boolean screenTimeGoalResult = IsAchieveUsingTime(user_id, filteredTexts);
+
+                        // 현재 날짜
+                        LocalDate today = LocalDate.now();
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                        String todayToString = today.format(formatter);
+
+                        // OCR 결과 저장
+                        ScreenTimeOCRResult result = ScreenTimeOCRResult.builder()
+                                .user_id(user_id)
+                                .date(todayToString)
+                                .result(filteredTexts)
+                                .isSuccess(screenTimeGoalResult)
+                                .build();
+
+                        getScreenTimeOCRRepository.save(result);
+                        response.put("entity", filteredTexts);
+                        System.out.println("OCR 결과 저장 완료.");
+
+                    } catch (Exception e) {
+                        DeleteFolderFiles(filePath);
+                        throw new CustomException(e.getMessage(), HttpStatus.BAD_REQUEST);
+                    }
+                } else {
+                    DeleteFolderFiles(filePath);
+                    throw new CustomException("파일 생성 시간이 유효하지 않습니다.", HttpStatus.BAD_REQUEST);
+                }
+
+                // 마지막에 임시 파일 삭제
+                DeleteFolderFiles(filePath);
+                return new ResponseEntity<>(response, HttpStatus.OK);
+
+            } catch (Exception e) {
+                System.out.print("Error: " + e.getMessage());
+                throw new CustomException("파일 업로드 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        }else{
+            throw new CustomException("설치된 앱 목록이 존재하지 않습니다.", HttpStatus.NOT_FOUND);
         }
     }
 
@@ -256,7 +280,7 @@ public class ScreenTimeService {
         NONE, IOS, ANDROID,
     }
 
-    private Map<String, Object> filterExtractedTexts(List<String> extractedTexts){
+    private Map<String, Object> filterExtractedTexts(List<String> extractedTexts, List<String> savedInstalledApps){
         Map<String, Object> result = new HashMap<>();
         List<Map<String, String>> categories = new ArrayList<>();
 
@@ -265,10 +289,8 @@ public class ScreenTimeService {
         Pattern minutesPattern = Pattern.compile("(\\d+)분");
 
         boolean mainTimeCaptured = false;
-        AtomicInteger timeCount = new AtomicInteger(1);
-        List<String> categoryName = new ArrayList<>();
+        AtomicInteger timeCount = new AtomicInteger(0);
         boolean isCategory = false;
-        phoneType type = phoneType.NONE;
 
         for(String text : extractedTexts){
             // 날짜 추출
@@ -290,27 +312,13 @@ public class ScreenTimeService {
                 continue;
             }
 
-            if(text.equals("최다 사용") || text.equals("카테고리 보기")) {
+            if(text.equals("최다 사용") || text.equals("카테고리 보기") || text.equals("많이 사용한 앱")) {
                 isCategory = true;
-                type = phoneType.IOS;
-
-                continue;
-            } else if(text.equals("많이 사용한 앱")) {
-                isCategory = true;
-                type = phoneType.ANDROID;
-
                 continue;
             }
 
             if(mainTimeCaptured && isCategory){
-                switch (type){
-                    case IOS:
-                        getIphoneCategoriesInfo(timeCount, timePattern, minutesPattern, text, categories);
-                        break;
-                    case ANDROID:
-                        getAndroidCategoriesInfo(categoryName, timeCount, timePattern, minutesPattern, text, categories);
-                        break;
-                }
+                getCategoriesInfo(timeCount, timePattern, minutesPattern, text, categories, savedInstalledApps);
             }
         }
 
@@ -318,52 +326,35 @@ public class ScreenTimeService {
         return result;
     }
 
-    private void getIphoneCategoriesInfo(AtomicInteger timeCount, Pattern timePattern, Pattern minutesPattern, String text, List<Map<String, String>> categories){
-        if(timeCount.get() <= 3){
-            Matcher MatcherFullTime = timePattern.matcher(text);
-            Matcher MinMatcher = minutesPattern.matcher(text);
+    private void getCategoriesInfo(AtomicInteger timeCount, Pattern timePattern, Pattern minutesPattern, String text, List<Map<String, String>> categories, List<String> savedInstalledApps){
+        try{
+            if(timeCount.get() <= 3){
+                Matcher MatcherFullTime = timePattern.matcher(text);
+                Matcher MinMatcher = minutesPattern.matcher(text);
 
-            boolean fullTimeMatch = MatcherFullTime.matches();
-            boolean minMatch = MinMatcher.matches();
-            if(fullTimeMatch || minMatch){
-                String subtime = fullTimeMatch ? TimeFormatter(MatcherFullTime) : TimeFormatter(MinMatcher);
-                Map<String, String> categoryTime = categories.get(timeCount.get() - 1);
-                categoryTime.put("time", subtime);
+                boolean fullTimeMatch = MatcherFullTime.matches();
+                boolean minMatch = MinMatcher.matches();
+                if(fullTimeMatch || minMatch){
+                    String subTime = fullTimeMatch ? TimeFormatter(MatcherFullTime) : TimeFormatter(MinMatcher);
+                    Map<String, String> categoryTime = categories.get(timeCount.get() - 1);
+                    categoryTime.put("time", subTime);
 
-                timeCount.incrementAndGet();
-            }else{
-                if (text.length() > 1 && text.matches(".*[가-힣a-zA-Z0-9].*")) {
-                    Map<String, String> category = new HashMap<>();
-                    category.put("name", text);
-                    categories.add(category);
+                    timeCount.incrementAndGet();
+                }else{
+                    if (text.length() > 1 && text.matches(".*[가-힣a-zA-Z0-9].*")) {
+                        if(savedInstalledApps.contains(text)){
+                            Map<String, String> category = new HashMap<>();
+                            category.put("name", text);
+                            categories.add(category);
+                        }
+                    }
                 }
             }
+        }catch(Exception error){
+            System.out.println("Error: " + error.getMessage());
+            throw new CustomException("그래프 분석 중 오류가 발생하였습니다.", HttpStatus.BAD_REQUEST);
         }
-    }
 
-    private void getAndroidCategoriesInfo(List<String> categoryName, AtomicInteger timeCount, Pattern timePattern, Pattern minutesPattern, String text, List<Map<String, String>> categories){
-        if(timeCount.get() <= 3){
-            Matcher MatcherFullTime = timePattern.matcher(text);
-            Matcher MinMatcher = minutesPattern.matcher(text);
-
-            boolean fullTimeMatch = MatcherFullTime.matches();
-            boolean minMatch = MinMatcher.matches();
-            if(fullTimeMatch || minMatch){
-                Map<String, String> category = new HashMap<>();
-                category.put("name", categoryName.get(categoryName.size() - (4 - timeCount.get())));
-                categories.add(category);
-
-                String subtime = fullTimeMatch ? TimeFormatter(MatcherFullTime) : TimeFormatter(MinMatcher);
-                Map<String, String> categoryTime = categories.get(timeCount.get() - 1);
-                categoryTime.put("time", subtime);
-
-                timeCount.incrementAndGet();
-            }else{
-                if (text.length() > 1 && text.matches(".*[가-힣a-zA-Z0-9].*")) {
-                    categoryName.add(text);
-                }
-            }
-        }
     }
 
     private boolean IsInValidScreenShot(String user_id, LocalDateTime fileCreationDateTime) throws ExecutionException, InterruptedException {
