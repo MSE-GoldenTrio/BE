@@ -106,7 +106,7 @@ public class ScreenTimeService {
                     .installed_apps(installedApps).build();
 
             if(savedInstalledApps == null){
-                installedAppsRepository.save(newInstalledApps);
+                installedAppsRepository.saveWithAutoIncrement(newInstalledApps);
             } else {
                 installedAppsRepository.update(newInstalledApps);
             }
@@ -170,7 +170,7 @@ public class ScreenTimeService {
                                 .isSuccess(screenTimeGoalResult)
                                 .build();
 
-                        getScreenTimeOCRRepository.save(result);
+                        getScreenTimeOCRRepository.saveWithAutoIncrement(result);
                         response.put("entity", filteredTexts);
                         System.out.println("OCR 결과 저장 완료.");
 
