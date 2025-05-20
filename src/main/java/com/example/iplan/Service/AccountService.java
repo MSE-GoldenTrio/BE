@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -45,12 +46,15 @@ public class AccountService {
         }
 
         // 3. 이미 연동된 자녀인지 확인
-        if (childUser.getLinked_id() != null && !childUser.getLinked_id().isEmpty()) {
+        log.info("이미 연동된 자녀인지 체크..");
+        List<String> linkedIds = childUser.getLinked_id();
+        if (linkedIds != null && linkedIds.stream().anyMatch(Objects::nonNull)) {
             response.put("success", false);
             response.put("message", "해당 자녀 계정은 이미 다른 계정과 연동되어 있습니다.");
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
         }
 
+        log.info("수락되지 않은 동일한 요청 체크..");
         // 4. 수락되지 않은 동일한 요청이 이미 존재하는지 확인
         PendingAccountRequest existingRequest = accountRepository.findExistingRequest(childNickname, parentNickname);
         if (existingRequest != null) {
@@ -59,6 +63,7 @@ public class AccountService {
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
         }
 
+        log.info("이미 해당 계정과 연동이 되어있는지 체크..");
         // 5. 이미 해당 계정과 연동이 되어있는지 확인
         PendingAccountRequest approvedRequest = accountRepository.findApprovedRequest(childNickname, parentNickname);
         if (approvedRequest != null) {
@@ -119,6 +124,10 @@ public class AccountService {
         }
     }
 
+    /**
+     * 아이가 부모의 요청을 승인 or 거부
+     * 이때 아이의 linked_id에 이미 부모가 존재한다면 수락 못하도록 !!
+     */
     public void respondToRequest(String childNickname, AccountRequestDTO dto)
             throws ExecutionException, InterruptedException {
 
@@ -138,32 +147,41 @@ public class AccountService {
         log.info("Parent Nickname: {}", parentNickname);
         log.info("연동 요청 승인 여부: {}", dto.isApproved());
 
+        // 2. 사용자 정보 조회
+        Users childUser = userRepository.findByFields(Map.of("nickname", childNickname));
+        Users parentUser = userRepository.findByFields(Map.of("nickname", parentNickname));
+
+        if (childUser == null || parentUser == null) {
+            throw new CustomException("유저 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        }
+
+        // 이미 다른 부모와 연동되어 있으면 수락 불가
+        List<String> linkedIds = childUser.getLinked_id();
+        if (dto.isApproved() && linkedIds != null && !linkedIds.isEmpty()) {
+            log.info("이미 다른 계정과 연동되어 있어 수락 불가");
+            throw new CustomException("이미 다른 계정과 연동되어 있어 수락할 수 없습니다.", HttpStatus.BAD_REQUEST);
+        }
+
         if (dto.isApproved()) {
-            // 1. PendingAccountRequest 요청 상태 업데이트 (approved -> true && status -> approved)
+            // 1. 요청 승인 상태로 변경
             request.setApproved(true);
             request.setStatus("approved");
             accountRepository.update(request);
 
-            // 2. 사용자 linked_id 업데이트
-            Users childUser = userRepository.findByFields(Map.of("nickname", childNickname));
-            Users parentUser = userRepository.findByFields(Map.of("nickname", parentNickname));
-
-            if (childUser == null || parentUser == null) {
-                throw new CustomException("유저 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            // 2. 서로의 linked_ids 갱신
+            if (!childUser.getLinked_id().contains(parentNickname)) {
+                childUser.getLinked_id().add(parentNickname);
             }
-
-            log.info("Child: {}, Parent: {}", childUser, parentUser);
-
-            // 서로의 linked_id 설정
-            childUser.setLinked_id(parentNickname);
-            parentUser.setLinked_id(childNickname);
+            if (!parentUser.getLinked_id().contains(childNickname)) {
+                parentUser.getLinked_id().add(childNickname);
+            }
             userRepository.update(childUser);
             userRepository.update(parentUser);
 
             log.info("부모-자녀 연결 완료: {} <-> {}", parentNickname, childNickname);
 
         } else {
-            // 거절 시 approved = false, status = denied
+            // 요청 거절 처리
             request.setApproved(false);
             request.setStatus("denied");
             accountRepository.update(request);
@@ -171,6 +189,7 @@ public class AccountService {
             log.info("연동 요청 거절 완료");
         }
     }
+
 
 
 
