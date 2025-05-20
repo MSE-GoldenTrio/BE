@@ -56,24 +56,6 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # iplan-firebase.json 생성
-      - name: Create Firebase Key
-        run: |
-          mkdir ./src/main/resources || true
-          cd ./src/main/resources
-          rm -rf ./iplan-firebase.json || true
-          echo "${{ secrets.FIREBASE_KEY }}" | base64 --decode > ./iplan-firebase.json
-        shell: bash
-
-      # GOOGLE_APPLICATION_CREDENTIALS json 파일 생성
-      - name: Create Google Application Credentials Key
-        run: |
-          mkdir ./src/main/resources || true
-          cd ./src/main/resources
-          rm -rf ./iplan-3e9c2-feef2236cd5b.json || true
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" | base64 --decode > ./iplan-3e9c2-feef2236cd5b.json
-        shell: bash
-
       # 2. Spring Boot 애플리케이션 빌드
       - name: Build with Gradle
         run: ./gradlew clean bootJar --no-daemon --warning-mode all
@@ -101,3 +83,19 @@ jobs:
           path: build/reports
 
       # 6. 배포 자동화: Docker Hub에서 이미지 가져와서 EC2에 배포 (추후 추가예정)
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/iplan-demo
+            docker stop iplan-container || true
+            docker rm iplan-container || true
+            docker run -d --name iplan-container -p 8080:8080 \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/app/iplan-3e9c2-feef2236cd5b.json \
+              -e FIREBASE_CONFIG_PATH=/app/iplan-firebase.json \
+              -v /home/ubuntu/iplan-3e9c2-feef2236cd5b.json:/app/iplan-3e9c2-feef2236cd5b.json \
+              -v /home/ubuntu/iplan-firebase.json:/app/iplan-firebase.json \
+              ${{ secrets.DOCKERHUB_USERNAME }}/iplan-demo
