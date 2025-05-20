@@ -12,8 +12,6 @@ services:
       - "8080:8080"
     environment:
       - FIREBASE_CONFIG_PATH=/app/iplan-firebase.json
-    volumes:
-      - ./src/main/resources/iplan-firebase.json:/app/iplan-firebase.json
 
   app3:
     image: hanni/test1

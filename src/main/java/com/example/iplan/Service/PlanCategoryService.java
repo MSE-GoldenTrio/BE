@@ -33,7 +33,7 @@ public class PlanCategoryService {
                 .build();
 
         try{
-            planCategoryRepository.save(planCategory);
+            planCategoryRepository.saveWithAutoIncrement(planCategory);
         }
         catch (Exception e){
             throw new CustomException("계획 카테고리 추가에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);
