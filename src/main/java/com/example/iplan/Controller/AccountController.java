@@ -53,6 +53,7 @@ public class AccountController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getChildPendingRequests(@AuthenticationPrincipal CustomOAuth2UserDetails user) {
         Map<String, Object> response = new HashMap<>();
+        log.info("Account API from child received!");
         try {
             String childNickname = user.getUsername();
             List<AccountRequestDTO> requests = accountService.getPendingRequestsForChild(childNickname);
@@ -72,5 +73,23 @@ public class AccountController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+
+    @PostMapping("/child/respond-request")
+    @ResponseBody
+    public ResponseEntity<?> respondToRequest(
+            @AuthenticationPrincipal CustomOAuth2UserDetails user,
+            @RequestBody AccountRequestDTO requestDto) {
+        log.info("Account Response API from child received!");
+
+        try {
+            String childNickname = user.getUsername(); // 현재 로그인한 자녀 닉네임
+            accountService.respondToRequest(childNickname, requestDto);
+            return ResponseEntity.ok(Map.of("success", true, "message", "요청 응답이 처리되었습니다."));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "요청 응답 처리 중 오류 발생: " + e.getMessage()));
+        }
+    }
+
 
 }
