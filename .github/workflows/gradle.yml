@@ -71,7 +71,7 @@ jobs:
           mkdir ./src/main/resources || true
           cd ./src/main/resources
           rm -rf ./iplan-3e9c2-feef2236cd5b.json || true
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" | base64 --decode >.iplan-3e9c2-feef2236cd5b.json
+          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" | base64 --decode > ./iplan-3e9c2-feef2236cd5b.json
         shell: bash
 
       # 2. Spring Boot 애플리케이션 빌드
