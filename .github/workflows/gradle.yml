@@ -65,6 +65,15 @@ jobs:
           echo "${{ secrets.FIREBASE_KEY }}" | base64 --decode > ./iplan-firebase.json
         shell: bash
 
+      # GOOGLE_APPLICATION_CREDENTIALS json 파일 생성
+      - name: Create Google Application Credentials Key
+        run: |
+          mkdir ./src/main/resources || true
+          cd ./src/main/resources
+          rm -rf ./iplan-3e9c2-feef2236cd5b.json || true
+          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" | base64 --decode >.iplan-3e9c2-feef2236cd5b.json
+        shell: bash
+
       # 2. Spring Boot 애플리케이션 빌드
       - name: Build with Gradle
         run: ./gradlew clean bootJar --no-daemon --warning-mode all
