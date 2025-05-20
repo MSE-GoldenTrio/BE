@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
@@ -96,6 +97,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         .nickname(randomNickname) // 랜덤 닉네임 할당
                         .password("")
                         .authority(UserRole.UNKNOWN) // UserRole 타입으로 직접 전달, 아직 권한 미지정
+                        .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
                         .build();
                 userRepository.save(user);
 

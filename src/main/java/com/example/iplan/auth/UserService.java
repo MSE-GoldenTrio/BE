@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
@@ -43,6 +44,7 @@ public class UserService {
                     .password(passwordEncoder.encode(password)) // 비밀번호 암호화
                     .name(name)
                     .authority(role)    // child, parent
+                    .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
                     .build();
 
             // 3. 사용자 정보 User 컬렉션에 저장 -> 자동 증가된 ID로 저장
