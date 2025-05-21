@@ -55,7 +55,7 @@ public class RewardParentsService {
                     .build();
 
             // 3. RewardParents 저장
-            rewardParentsRepository.save(newRewardParents);
+            rewardParentsRepository.saveWithAutoIncrement(newRewardParents);
 
             // 4. RewardChild의 보상 지급 상태를 업데이트하고 저장
             reward.setRewarded(true);

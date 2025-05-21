@@ -89,8 +89,6 @@ public class JwtTokenProvider {
         log.info("claim.getSubject is 'Nickname' = {}", claims.getSubject());
 
         String nickname = claims.getSubject();
-
-        @SuppressWarnings("unchecked")
         List<String> linked_id = claims.get("linked_id", List.class); // claim 없으면 null 반환
 
         // role 정보가 없는 경우 예외 처리

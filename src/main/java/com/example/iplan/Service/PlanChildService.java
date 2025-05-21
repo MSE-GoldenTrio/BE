@@ -62,7 +62,7 @@ public class PlanChildService {
             response.put("message", "계획이 정상적으로 추가되었습니다.");
             response.put("id", planPost.getId());
 
-            response = dayDataService.GenerateOrSaveDayPlanData(response, planPost, user_id);
+            //response = dayDataService.GenerateOrSaveDayPlanData(response, planPost, user_id);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } else {
             throw new CustomException("유저 아이디가 올바르지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -240,7 +240,7 @@ public class PlanChildService {
                 .build();
 
         try{
-            setScreenTimeRepository.save(newScreenTime);
+            setScreenTimeRepository.saveWithAutoIncrement(newScreenTime);
         }
         catch(Exception e){
             throw new CustomException("스크린 타임 설정에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);

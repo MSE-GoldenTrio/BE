@@ -37,6 +37,7 @@ dependencies {
 		exclude group: 'commons-logging', module: 'commons-logging'
 	}
 	implementation 'org.springframework:spring-jcl'
+	implementation 'io.grpc:grpc-protobuf-lite:1.62.2'
 
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'

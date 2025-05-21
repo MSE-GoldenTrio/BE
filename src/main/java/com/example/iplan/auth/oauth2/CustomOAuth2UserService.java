@@ -99,7 +99,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         .authority(UserRole.UNKNOWN) // UserRole 타입으로 직접 전달, 아직 권한 미지정
                         .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
                         .build();
-                userRepository.save(user);
+                userRepository.saveWithAutoIncrement(user);
 
                 isNewUser = true; // 신규 회원
                 log.info("New user registered: {}, Random nickname: {}", user.getEmail(), randomNickname);
