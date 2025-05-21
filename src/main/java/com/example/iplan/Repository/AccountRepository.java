@@ -30,6 +30,17 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
         return findAllByFields(filters);
     }
 
+    public PendingAccountRequest findByChildNicknameAndParentNickname(String childNickname, String parentNickname)
+            throws ExecutionException, InterruptedException {
+
+        Map<String, Object> filters = Map.of(
+                "childNickname", childNickname,
+                "parentNickname", parentNickname
+        );
+
+        return findByFields(filters);
+    }
+
     // 수락되지 않은 동일한 요청이 이미 존재하는지 확인
     public PendingAccountRequest findExistingRequest(String childNickname, String parentNickname)
         throws ExecutionException, InterruptedException {
@@ -55,6 +66,17 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
         );
         return findByFields(filters);
     }
+
+    // 부모가 보낸 요청이 있는지 확인
+    public PendingAccountRequest findParentRequest(String parentNickname)
+            throws ExecutionException, InterruptedException {
+
+        Map<String, Object> filters = Map.of(
+                "parentNickname", parentNickname
+        );
+        return findByFields(filters);
+    }
+
     /**
      * DTO 변환
      */
