@@ -8,88 +8,27 @@ import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.UserRole;
 import com.example.iplan.auth.Users;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
+import com.example.iplan.config.jwt.JwtToken;
+import com.example.iplan.config.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AccountService {
+public class AccountChildService {
 
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
-
-    /**
-     * 부모가 자녀 닉네임을 입력하여 연동 요청을 보냄
-     */
-    public ResponseEntity<Map<String, Object>> sendAccountRequest(String childNickname, String parentNickname)
-            throws ExecutionException, InterruptedException {
-
-        Map<String, Object> response = new HashMap<>();
-
-        // 1. 자녀 유저 조회
-        Users childUser = userRepository.findByNickname(childNickname)
-                .orElseThrow(() -> new CustomException("해당 닉네임의 자녀를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
-
-        // 2. 자녀인지 확인
-        if (childUser.getAuthority() != UserRole.CHILD) {
-            throw new CustomException("입력한 닉네임은 자녀 계정이 아닙니다.", HttpStatus.BAD_REQUEST);
-        }
-
-        // 3. 이미 연동된 자녀인지 확인
-        log.info("이미 연동된 자녀인지 체크..");
-        List<String> linkedIds = childUser.getLinked_id();
-        if (linkedIds != null && linkedIds.stream().anyMatch(Objects::nonNull)) {
-            response.put("success", false);
-            response.put("message", "해당 자녀 계정은 이미 다른 계정과 연동되어 있습니다.");
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-        }
-
-        log.info("수락되지 않은 동일한 요청 체크..");
-        // 4. 수락되지 않은 동일한 요청이 이미 존재하는지 확인
-        PendingAccountRequest existingRequest = accountRepository.findExistingRequest(childNickname, parentNickname);
-        if (existingRequest != null) {
-            response.put("success", false);
-            response.put("message", "이미 해당 자녀에게 연동 요청을 보냈습니다. 요청이 승인될 때까지 기다려주세요.");
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-        }
-
-        log.info("이미 해당 계정과 연동이 되어있는지 체크..");
-        // 5. 이미 해당 계정과 연동이 되어있는지 확인
-        PendingAccountRequest approvedRequest = accountRepository.findApprovedRequest(childNickname, parentNickname);
-        if (approvedRequest != null) {
-            response.put("success", false);
-            response.put("message", "이미 해당 자녀와 연동이 되어있습니다.");
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-        }
-
-        // 5. PendingAccountRequest 생성
-        PendingAccountRequest request = PendingAccountRequest.builder()
-                .childNickname(childNickname)
-                .parentNickname(parentNickname)
-                .approved(false)
-                .status("pending")
-                .build();
-
-        // 6. 저장
-        accountRepository.saveWithAutoIncrement(request);
-
-        // 7. 응답 반환
-        response.put("success", true);
-        response.put("message", "자녀에게 연동 요청이 전송되었습니다.");
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
-
-
+    private final JwtTokenProvider jwtTokenProvider;
 
     /**
      * 자녀가 부모의 연동 요청을 확인
@@ -128,7 +67,7 @@ public class AccountService {
      * 아이가 부모의 요청을 승인 or 거부
      * 이때 아이의 linked_id에 이미 부모가 존재한다면 수락 못하도록 !!
      */
-    public void respondToRequest(String childNickname, AccountRequestDTO dto)
+    public String respondToRequest(String childNickname, AccountRequestDTO dto)
             throws ExecutionException, InterruptedException {
 
         log.info("연동 요청 응답 서비스");
@@ -155,20 +94,20 @@ public class AccountService {
             throw new CustomException("유저 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
         }
 
-        // 이미 다른 부모와 연동되어 있으면 수락 불가
         List<String> linkedIds = childUser.getLinked_id();
         if (dto.isApproved() && linkedIds != null && !linkedIds.isEmpty()) {
             log.info("이미 다른 계정과 연동되어 있어 수락 불가");
+            request.setApproved(false);
+            request.setStatus("denied");
+            accountRepository.update(request);
             throw new CustomException("이미 다른 계정과 연동되어 있어 수락할 수 없습니다.", HttpStatus.BAD_REQUEST);
         }
 
         if (dto.isApproved()) {
-            // 1. 요청 승인 상태로 변경
             request.setApproved(true);
             request.setStatus("approved");
             accountRepository.update(request);
 
-            // 2. 서로의 linked_ids 갱신
             if (!childUser.getLinked_id().contains(parentNickname)) {
                 childUser.getLinked_id().add(parentNickname);
             }
@@ -180,19 +119,22 @@ public class AccountService {
 
             log.info("부모-자녀 연결 완료: {} <-> {}", parentNickname, childNickname);
 
+            // 연동 완료된 childUser로 토큰 재발급
+            CustomOAuth2UserDetails userDetails = new CustomOAuth2UserDetails(childUser);
+            Authentication authentication = new UsernamePasswordAuthenticationToken(
+                    userDetails, null, userDetails.getAuthorities()
+            );
+            JwtToken newToken = jwtTokenProvider.generateToken(authentication);
+            log.info("계정 연동으로 child 토큰 재발급: {}", newToken);
+            return newToken.getAccessToken();
         } else {
-            // 요청 거절 처리
             request.setApproved(false);
             request.setStatus("denied");
             accountRepository.update(request);
-
             log.info("연동 요청 거절 완료");
+            return null; // 거절 시 토큰 재발급 없음
         }
     }
-
-
-
-
 
 
 }
