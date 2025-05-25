@@ -8,10 +8,12 @@ import com.example.iplan.Repository.GetScreenTimeOCRRepository;
 import com.example.iplan.Repository.InstalledAppsRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
 import com.example.iplan.util.SimplePair;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.vision.v1.*;
 import com.google.cloud.vision.v1.Image;
 import com.google.protobuf.ByteString;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -220,7 +222,14 @@ public class ScreenTimeService {
         Feature feat = Feature.newBuilder().setType(Feature.Type.TEXT_DETECTION).build();
         AnnotateImageRequest request = AnnotateImageRequest.newBuilder().addFeatures(feat).setImage(img).build();
 
-        try (ImageAnnotatorClient client = ImageAnnotatorClient.create()) {
+        try (ImageAnnotatorClient client = ImageAnnotatorClient.create(
+                ImageAnnotatorSettings.newBuilder()
+                        .setCredentialsProvider(() ->
+                                GoogleCredentials.fromStream(
+                                        new ClassPathResource("iplan-3e9c2-feef2236cd5b.json").getInputStream()
+                                )
+                        ).build()
+        )) {
             AnnotateImageResponse response = client.batchAnnotateImages(
                     java.util.Collections.singletonList(request)).getResponses(0);
 

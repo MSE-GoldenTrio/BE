@@ -36,5 +36,6 @@ out/
 ### VS Code ###
 .vscode/
 /src/main/resources/iplan-firebase.json
+/src/main/resources/iplan-3e9c2-feef2236cd5b.json
 application.yml
 application-oauth2.yml

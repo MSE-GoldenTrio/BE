@@ -18,15 +18,63 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
         setCollectionName("PendingAccountRequest");
     }
 
-    public List<PendingAccountRequest> findByChildNicknameAndApproved(String childNickname, boolean approved)
+    public List<PendingAccountRequest> findByChildNicknameAndApprovedAndStatus(String childNickname, boolean approved, String status)
             throws ExecutionException, InterruptedException {
 
         Map<String, Object> filters = Map.of(
                 "childNickname", childNickname,
-                "approved", approved
+                "approved", approved,
+                "status", status
         );
 
         return findAllByFields(filters);
+    }
+
+    public PendingAccountRequest findByChildNicknameAndParentNickname(String childNickname, String parentNickname)
+            throws ExecutionException, InterruptedException {
+
+        Map<String, Object> filters = Map.of(
+                "childNickname", childNickname,
+                "parentNickname", parentNickname
+        );
+
+        return findByFields(filters);
+    }
+
+    // 수락되지 않은 동일한 요청이 이미 존재하는지 확인
+    public PendingAccountRequest findExistingRequest(String childNickname, String parentNickname)
+        throws ExecutionException, InterruptedException {
+
+        Map<String, Object> filters = Map.of(
+                "childNickname", childNickname,
+                "parentNickname", parentNickname,
+                "approved", false,
+                "status", "pending"
+        );
+        return findByFields(filters);
+    }
+
+    // 이미 해당 계정과 연동이 되어있는지 확인
+    public PendingAccountRequest findApprovedRequest(String childNickname, String parentNickname)
+        throws ExecutionException, InterruptedException {
+
+        Map<String, Object> filters = Map.of(
+                "childNickname", childNickname,
+                "parentNickname", parentNickname,
+                "approved", true,
+                "status", "approved"
+        );
+        return findByFields(filters);
+    }
+
+    // 부모가 보낸 요청이 있는지 확인
+    public PendingAccountRequest findParentRequest(String parentNickname)
+            throws ExecutionException, InterruptedException {
+
+        Map<String, Object> filters = Map.of(
+                "parentNickname", parentNickname
+        );
+        return findByFields(filters);
     }
 
     /**
@@ -34,6 +82,7 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
      */
     public AccountRequestDTO convertToDTO(PendingAccountRequest entity) {
         return AccountRequestDTO.builder()
+                .id(entity.getId())
                 .childNickname(entity.getChildNickname())
                 .parentNickname(entity.getParentNickname())
                 .approved(entity.isApproved())

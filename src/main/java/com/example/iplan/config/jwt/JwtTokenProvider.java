@@ -41,7 +41,7 @@ public class JwtTokenProvider {
         CustomOAuth2UserDetails userDetails = (CustomOAuth2UserDetails) authentication.getPrincipal();
 
         String nickname = userDetails.getUser().getNickname();
-        String linked_id = userDetails.getUser().getLinked_id();
+        List<String> linked_id = userDetails.getUser().getLinked_id();
 
         // 사용자 권한 리스트 추출 (ROLE_CHILD, ROLE_PARENT → CHILD, PARENT 변환)
         // authentication.getAuthorities()에서 GrantedAuthority의 getAuthority()를 호출하여 문자열(ROLE_CHILD, ROLE_PARENT)을 가져옴
@@ -62,7 +62,7 @@ public class JwtTokenProvider {
         String accessToken = Jwts.builder()
                 .setSubject(nickname)
                 .claim("role", role.name()) // Enum 값 저장 (CHILD, PARENT)
-                .claim("linked_id", linked_id)
+                .claim("linked_id", linked_id)  // 리스트로 저장
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
@@ -89,7 +89,7 @@ public class JwtTokenProvider {
         log.info("claim.getSubject is 'Nickname' = {}", claims.getSubject());
 
         String nickname = claims.getSubject();
-        String linked_id = claims.get("linked_id", String.class); // claim 없으면 null 반환
+        List<String> linked_id = claims.get("linked_id", List.class); // claim 없으면 null 반환
 
         // role 정보가 없는 경우 예외 처리
         if (claims.get("role") == null) {

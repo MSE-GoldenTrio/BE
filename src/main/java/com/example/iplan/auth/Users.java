@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -38,8 +39,8 @@ public class Users {
     @Schema(description = "사용자 권한(아이/부모)", example = "CHILD", requiredMode = Schema.RequiredMode.REQUIRED)
     private UserRole authority;
 
-    @Schema(description = "사용자와 연동된 id", example = "abc456")
-    private String linked_id = null;
+    @Schema(description = "사용자와 연동된 ID 목록", example = "[\"child1\", \"child2\"]")
+    private List<String> linked_id = new ArrayList<>();
 
     @Schema(description = "사용자 기기 토큰 값", example = "abc456")
     private String fcmToken = null;

@@ -234,6 +234,27 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         return Collections.emptyList();
     }
 
+    public List<T> findAllByFieldIn(String fieldName, List<Object> values, Map<String, Object> additionalFilters)
+            throws ExecutionException, InterruptedException {
+        CollectionReference collection = firestore.collection(collectionName);
+
+        // 기본 whereIn 조건
+        Query query = collection.whereIn(fieldName, values);
+
+        // 추가 필터 적용
+        for (Map.Entry<String, Object> entry : additionalFilters.entrySet()) {
+            query = query.whereEqualTo(entry.getKey(), entry.getValue());
+        }
+
+        ApiFuture<QuerySnapshot> apiFuture = query.get();
+        QuerySnapshot querySnapshot = apiFuture.get();
+
+        if (!querySnapshot.isEmpty()) {
+            return querySnapshot.toObjects(entityClass);
+        }
+        return Collections.emptyList();
+    }
+
     /**
      * entity 객체에서 문서 ID를 추출한다.
      * entity가 DocumentId를 포함하는 필드가 있다면 해당 필드에서 ID를 가져온다.

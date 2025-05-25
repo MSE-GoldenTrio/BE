@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 @Builder
 @Schema(description = "계정 연동 요청 DTO")
 public class AccountRequestDTO {
+    private String id;
     private String childNickname;
     private String parentNickname;
     private boolean approved; // 자녀가 승인했는지 여부

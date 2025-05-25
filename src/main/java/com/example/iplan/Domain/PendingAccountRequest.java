@@ -19,4 +19,5 @@ public class PendingAccountRequest {
     private String childNickname;
     private String parentNickname;
     private boolean approved; // 자녀가 승인했는지 여부
+    private String status;  // 요청 상태 (pending, approved, denied)
 }
