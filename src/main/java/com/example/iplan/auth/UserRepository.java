@@ -45,4 +45,17 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
         }
     }
 
+    public boolean isLinkedToChild(String parentUid, String childUid) {
+        try {
+            Users parent = findByFields(Map.of("nickname", parentUid));
+            if (parent != null && parent.getLinked_id() != null) {
+                return parent.getLinked_id().contains(childUid);
+            }
+        } catch (ExecutionException | InterruptedException e) {
+            e.printStackTrace();
+            return false;
+        }
+        return false;
+    }
+
 }
