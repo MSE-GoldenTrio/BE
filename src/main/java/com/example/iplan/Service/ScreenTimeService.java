@@ -199,7 +199,8 @@ public class ScreenTimeService {
                 return new ResponseEntity<>(response, HttpStatus.OK);
 
             } catch (Exception e) {
-                System.out.print("Error: " + e.getMessage());
+                System.out.println("Error: " + e.getMessage());
+                e.printStackTrace();
                 throw new CustomException("파일 업로드 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }else{
@@ -302,28 +303,34 @@ public class ScreenTimeService {
         boolean isCategorySection = false;
         AtomicInteger timeCount = new AtomicInteger(0);
 
-        result.put(KEY_DATE, LocalDate.now().toString());
+        try{
+            result.put(KEY_DATE, LocalDate.now().toString());
 
-        for (String text : extractedTexts) {
-            if (!mainTimeCaptured && TIME_PATTERN.matcher(text).matches()) {
-                result.put(KEY_MAIN_TIME, TimeFormatter(TIME_PATTERN.matcher(text)));
-                mainTimeCaptured = true;
-                timeCount.incrementAndGet();
-                continue;
+            for (String text : extractedTexts) {
+                if (!mainTimeCaptured && TIME_PATTERN.matcher(text).matches()) {
+                    result.put(KEY_MAIN_TIME, TimeFormatter(TIME_PATTERN.matcher(text)));
+                    mainTimeCaptured = true;
+                    timeCount.incrementAndGet();
+                    continue;
+                }
+
+                if (CATEGORY_TRIGGER_KEYWORDS.contains(text)) {
+                    isCategorySection = true;
+                    continue;
+                }
+
+                if (mainTimeCaptured && isCategorySection) {
+                    processCategoryInfo(text, timeCount, categories, savedInstalledApps);
+                }
             }
 
-            if (CATEGORY_TRIGGER_KEYWORDS.contains(text)) {
-                isCategorySection = true;
-                continue;
-            }
-
-            if (mainTimeCaptured && isCategorySection) {
-                processCategoryInfo(text, timeCount, categories, savedInstalledApps);
-            }
+            result.put(KEY_CATEGORIES, categories);
+            return result;
+        }catch(Exception e){
+            System.out.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            throw new CustomException("추출된 텍스트 분석(filter)중 오류가 발생하였습니다.", HttpStatus.BAD_REQUEST);
         }
-
-        result.put(KEY_CATEGORIES, categories);
-        return result;
     }
 
     private void processCategoryInfo(String text, AtomicInteger timeCount, List<Map<String, String>> categories, List<String> savedInstalledApps) {
@@ -344,6 +351,8 @@ public class ScreenTimeService {
                 category.put("name", text);
                 categories.add(category);
             }
+
+
 
         } catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
@@ -394,6 +403,10 @@ public class ScreenTimeService {
     }
 
     private String TimeFormatter(Matcher matcher) {
+        if (!matcher.matches()) {
+            throw new CustomException("No Match Found", HttpStatus.BAD_REQUEST);
+        }
+
         LocalTime parseTime = LocalTime.MIDNIGHT;
 
         if (matcher.groupCount() == 2) {
@@ -404,6 +417,8 @@ public class ScreenTimeService {
             int minutes = Integer.parseInt(matcher.group(1));
             parseTime = LocalTime.of(0, minutes);
         }
+
         return parseTime.format(DateTimeFormatter.ofPattern("HH:mm"));
     }
+
 }
