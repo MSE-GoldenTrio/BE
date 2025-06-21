@@ -1,4 +1,4 @@
-package com.example.iplan.config.jwt;
+package com.example.iplan.auth.jwt;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
