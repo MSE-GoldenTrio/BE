@@ -46,6 +46,15 @@ public class ScreenTimeService {
 
     private final InstalledAppsRepository installedAppsRepository;
 
+    private static final String KEY_DATE = "date";
+    private static final String KEY_MAIN_TIME = "mainTime";
+    private static final String KEY_CATEGORIES = "categories";
+
+    private static final Pattern TIME_PATTERN = Pattern.compile("(\\d+)시간 (\\d+)분");
+    private static final Pattern MINUTES_PATTERN = Pattern.compile("(\\d+)분");
+
+    private static final Set<String> CATEGORY_TRIGGER_KEYWORDS = Set.of("최다 사용", "카테고리 보기", "많이 사용한 앱");
+
     public ResponseEntity<Map<String, Object>> getScreenTimeGraph(String user_id, String targetDate) throws ExecutionException, InterruptedException{
         Map<String, Object> response = new HashMap<>();
 
@@ -190,7 +199,8 @@ public class ScreenTimeService {
                 return new ResponseEntity<>(response, HttpStatus.OK);
 
             } catch (Exception e) {
-                System.out.print("Error: " + e.getMessage());
+                System.out.println("Error: " + e.getMessage());
+                e.printStackTrace();
                 throw new CustomException("파일 업로드 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }else{
@@ -285,85 +295,73 @@ public class ScreenTimeService {
         }
     }
 
-    public enum phoneType {
-        NONE, IOS, ANDROID,
-    }
-
-    private Map<String, Object> filterExtractedTexts(List<String> extractedTexts, List<String> savedInstalledApps){
+    public Map<String, Object> filterExtractedTexts(List<String> extractedTexts, List<String> savedInstalledApps) {
         Map<String, Object> result = new HashMap<>();
         List<Map<String, String>> categories = new ArrayList<>();
 
-        //Pattern datePattern = Pattern.compile("(\\d+)월 (\\d+)일");
-        Pattern timePattern = Pattern.compile("(\\d+)시간 (\\d+)분");
-        Pattern minutesPattern = Pattern.compile("(\\d+)분");
-
         boolean mainTimeCaptured = false;
+        boolean isCategorySection = false;
         AtomicInteger timeCount = new AtomicInteger(0);
-        boolean isCategory = false;
 
-        for(String text : extractedTexts){
-            // 날짜 추출
-            //Matcher dateMatcher = datePattern.matcher(text);
-            Matcher mainTimeMatcher = timePattern.matcher(text);
-
-            if(!result.containsKey("date")){
-                result.put("date", LocalDate.now().toString());
-                continue;
-            }
-            // 메인 시간 추출
-            if(!mainTimeCaptured && mainTimeMatcher.matches()){
-                String mainTime = TimeFormatter(mainTimeMatcher);
-                result.put("mainTime", mainTime);
-
-                mainTimeCaptured = true;
-                timeCount.incrementAndGet();
-
-                continue;
-            }
-
-            if(text.equals("최다 사용") || text.equals("카테고리 보기") || text.equals("많이 사용한 앱")) {
-                isCategory = true;
-                continue;
-            }
-
-            if(mainTimeCaptured && isCategory){
-                getCategoriesInfo(timeCount, timePattern, minutesPattern, text, categories, savedInstalledApps);
-            }
-        }
-
-        result.put("categories", categories);
-        return result;
-    }
-
-    private void getCategoriesInfo(AtomicInteger timeCount, Pattern timePattern, Pattern minutesPattern, String text, List<Map<String, String>> categories, List<String> savedInstalledApps){
         try{
-            if(timeCount.get() <= 3){
-                Matcher MatcherFullTime = timePattern.matcher(text);
-                Matcher MinMatcher = minutesPattern.matcher(text);
+            result.put(KEY_DATE, LocalDate.now().toString());
 
-                boolean fullTimeMatch = MatcherFullTime.matches();
-                boolean minMatch = MinMatcher.matches();
-                if(fullTimeMatch || minMatch){
-                    String subTime = fullTimeMatch ? TimeFormatter(MatcherFullTime) : TimeFormatter(MinMatcher);
-                    Map<String, String> categoryTime = categories.get(timeCount.get() - 1);
-                    categoryTime.put("time", subTime);
-
+            for (String text : extractedTexts) {
+                if (!mainTimeCaptured && TIME_PATTERN.matcher(text).matches()) {
+                    result.put(KEY_MAIN_TIME, TimeFormatter(TIME_PATTERN.matcher(text)));
+                    mainTimeCaptured = true;
                     timeCount.incrementAndGet();
-                }else{
-                    if (text.length() > 1 && text.matches(".*[가-힣a-zA-Z0-9].*")) {
-                        if(savedInstalledApps.contains(text)){
-                            Map<String, String> category = new HashMap<>();
-                            category.put("name", text);
-                            categories.add(category);
-                        }
-                    }
+                    continue;
+                }
+
+                if (CATEGORY_TRIGGER_KEYWORDS.contains(text)) {
+                    isCategorySection = true;
+                    continue;
+                }
+
+                if (mainTimeCaptured && isCategorySection) {
+                    processCategoryInfo(text, timeCount, categories, savedInstalledApps);
                 }
             }
-        }catch(Exception error){
-            System.out.println("Error: " + error.getMessage());
+
+            result.put(KEY_CATEGORIES, categories);
+            return result;
+        }catch(Exception e){
+            System.out.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            throw new CustomException("추출된 텍스트 분석(filter)중 오류가 발생하였습니다.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void processCategoryInfo(String text, AtomicInteger timeCount, List<Map<String, String>> categories, List<String> savedInstalledApps) {
+        try {
+            if (timeCount.get() > 3) return;
+
+            Matcher timeMatcher = TIME_PATTERN.matcher(text);
+            Matcher minutesMatcher = MINUTES_PATTERN.matcher(text);
+
+            if (timeMatcher.matches() || minutesMatcher.matches()) {
+                String time = timeMatcher.matches() ? TimeFormatter(timeMatcher) : TimeFormatter(minutesMatcher);
+                if (timeCount.get() - 1 < categories.size()) {
+                    categories.get(timeCount.get() - 1).put("time", time);
+                    timeCount.incrementAndGet();
+                }
+            } else if (isValidAppName(text) && savedInstalledApps.contains(text)) {
+                Map<String, String> category = new HashMap<>();
+                category.put("name", text);
+                categories.add(category);
+            }
+
+
+
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
             throw new CustomException("그래프 분석 중 오류가 발생하였습니다.", HttpStatus.BAD_REQUEST);
         }
+    }
 
+    private boolean isValidAppName(String text) {
+        return text != null && text.length() > 1 && text.matches(".*[가-힣a-zA-Z0-9].*");
     }
 
     private boolean IsInValidScreenShot(String user_id, LocalDateTime fileCreationDateTime) throws ExecutionException, InterruptedException {
@@ -405,6 +403,10 @@ public class ScreenTimeService {
     }
 
     private String TimeFormatter(Matcher matcher) {
+        if (!matcher.matches()) {
+            throw new CustomException("No Match Found", HttpStatus.BAD_REQUEST);
+        }
+
         LocalTime parseTime = LocalTime.MIDNIGHT;
 
         if (matcher.groupCount() == 2) {
@@ -415,6 +417,8 @@ public class ScreenTimeService {
             int minutes = Integer.parseInt(matcher.group(1));
             parseTime = LocalTime.of(0, minutes);
         }
+
         return parseTime.format(DateTimeFormatter.ofPattern("HH:mm"));
     }
+
 }
