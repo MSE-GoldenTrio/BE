@@ -72,8 +72,8 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
             DocumentSnapshot snapshot = transaction.get(counterRef).get();
             int newId = 1;
 
-            if (!snapshot.exists()) {
-                // 🔥 문서가 없으면 새 문서를 생성하고 lastId를 1로 설정
+            if (!snapshot.exists() || snapshot.getLong("lastId") == null) {
+                // 문서가 없거나 필드가 없을 경우 초기화
                 Map<String, Object> initData = new HashMap<>();
                 initData.put("lastId", 1);
                 transaction.set(counterRef, initData);
@@ -191,6 +191,27 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
 
         return null;
     }
+
+    /**
+     * 하나의 필드 조건으로 단일 문서를 찾는 메서드
+     * 예: 특정 reward_id, child_id 등으로 단일 문서를 검색할 때 사용
+     *
+     * @param fieldName 필드 이름
+     * @param value 필드 값
+     * @return 조건에 맞는 문서, 없으면 null
+     */
+    public T findByField(String fieldName, Object value) throws ExecutionException, InterruptedException {
+        CollectionReference collection = firestore.collection(collectionName);
+        ApiFuture<QuerySnapshot> apiFuture = collection.whereEqualTo(fieldName, value).get();
+        QuerySnapshot querySnapshot = apiFuture.get();
+
+        if (!querySnapshot.isEmpty()) {
+            return querySnapshot.getDocuments().get(0).toObject(entityClass);
+        }
+
+        return null;
+    }
+
 
     /**
      * 여러가지 조건에 해당하는 단일 문서를 찾기 위한 메서드
