@@ -1,4 +1,4 @@
-package com.example.iplan.config.jwt;
+package com.example.iplan.auth.jwt;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
