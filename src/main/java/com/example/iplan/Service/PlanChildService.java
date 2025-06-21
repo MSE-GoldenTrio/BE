@@ -69,26 +69,6 @@ public class PlanChildService {
         }
     }
 
-    /**
-     * 해당 날짜의 추가한 계획 리스트들을 전부 보여주는 기능
-     * 엔티티가 아닌 Dto로 넘겨준다.
-     * 목표 리스트에서 보여주고 싶은 정보만 넘겨주기 위해서
-     * @param targetDate 해당 날짜 "yyyy-MM-dd" 형식
-     * @return 해당 날짜 계획 리스트
-     * @throws ExecutionException
-     * @throws InterruptedException
-     */
-    public Map<String, Object> findAllPlanList(String user_id, @JsonFormat(pattern = "yyyy-MM-dd") String targetDate) throws ExecutionException, InterruptedException {
-        Map<String, Object> response = new HashMap<>();
-
-        List<PlanChildDTO> planDtoList = findAllPlanInTargetDate(user_id, targetDate);
-
-        response.put("success", true);
-        response.put("message", targetDate+" 의 계획 리스트를 불러오는데 성공했습니다.");
-        response.put("entity", planDtoList);
-        return response;
-    }
-
     public List<PlanChildDTO> findAllPlanInTargetDate(String user_id, @JsonFormat(pattern = "yyy-MM-dd") String targetDate) throws ExecutionException, InterruptedException {
         List<PlanChild> planEntityList = planChildRepository.findByDate(user_id, targetDate);
 
@@ -120,16 +100,12 @@ public class PlanChildService {
 
     /**
      * 날짜 제한 없이 사용자의 모든 계획 목록을 반환
-     * @param user_id
-     * @return
-     * @throws ExecutionException
-     * @throws InterruptedException
      */
-    public Map<String, Object> getAllPlans(String user_id) throws ExecutionException, InterruptedException {
+    public Map<String, Object> getAllPlans(String childNickname) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
 
-        // 사용자 ID 기준으로 Firestore에서 모든 계획 가져오기
-        List<PlanChild> plans = planChildRepository.findEntityAll(user_id);
+        // childNickname 기준으로 Firestore에서 모든 계획 가져오기
+        List<PlanChild> plans = planChildRepository.findEntityAll(childNickname);
 
         if (plans == null || plans.isEmpty()) {
             response.put("success", false);
