@@ -29,7 +29,7 @@ import java.util.concurrent.ExecutionException;
 @Slf4j
 @RequiredArgsConstructor
 @Controller
-@RequestMapping("/reward-child")
+@RequestMapping("/child/reward")
 @Tag(name = "아이들 보상 관리 컨트롤러", description = "보상 추가, 삭제, 한 달간의 총 개수 등을 처리한다.")
 public class RewardChildController {
 
@@ -83,7 +83,7 @@ public class RewardChildController {
      * @return 해당 날짜의 보상 정보
      */
     @Operation(summary = "특정 날짜의 보상 GET", description = "특정 날짜의 보상을 가져온다.")
-    @GetMapping("/daily-reward")
+    @GetMapping("/daily")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getDailyReward(
             @RequestParam int year,
@@ -118,7 +118,7 @@ public class RewardChildController {
      * @return 모든 보상 목록
      */
     @Operation(summary = "모든 보상 목록 GET", description = "해당 사용자의 모든 보상 목록을 조회한다.")
-    @GetMapping("/all-rewards")
+    @GetMapping("/list")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getAllRewards(@AuthenticationPrincipal CustomOAuth2UserDetails user) {
         Map<String, Object> response = new HashMap<>();
