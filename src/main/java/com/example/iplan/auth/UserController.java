@@ -3,8 +3,8 @@ package com.example.iplan.auth;
 import com.example.iplan.auth.DTO.SignInDTO;
 import com.example.iplan.auth.DTO.SignUpDTO;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
-import com.example.iplan.config.jwt.JwtToken;
-import com.example.iplan.config.jwt.JwtTokenProvider;
+import com.example.iplan.auth.jwt.JwtToken;
+import com.example.iplan.auth.jwt.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,22 +13,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
 @Slf4j
-@RequestMapping("/api/auth")
+@RequestMapping("/api")
 public class UserController {
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
 
-    @PostMapping("/register")
+    @PostMapping("/auth/register")
     @Operation(summary = "회원가입")
     public ResponseEntity<String> signUp(@RequestBody SignUpDTO signUpDto){
         try {
@@ -47,7 +45,7 @@ public class UserController {
         }
     }
 
-    @PostMapping("/login")
+    @PostMapping("/auth/login")
     @Operation(summary = "로그인")
     public JwtToken signIn(@RequestBody SignInDTO signInDto) {
         String nickname = signInDto.getNickname();
@@ -61,7 +59,7 @@ public class UserController {
     }
 
 
-    @PostMapping("/check-nickname")
+    @PostMapping("/auth/check-nickname")
     @Operation(summary = "중복 아이디 체크")
     public ResponseEntity<Map<String, Boolean>> checkNickname(@RequestBody Map<String, String> request) {
         String nickname = request.get("nickname");
@@ -70,12 +68,15 @@ public class UserController {
         return ResponseEntity.ok(Map.of("available", isAvailable));
     }
 
+
     /**
      * 닉네임으로 사용자 정보 조회 -> 전체 정보 반환!!
      */
-    @GetMapping("/user-info")
-    public ResponseEntity<Map<String, Object>> getUserInfo(@AuthenticationPrincipal String nickname) {
+    @GetMapping("/unknown/user-info")
+    public ResponseEntity<Map<String, Object>> getUserInfo(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails) {
+
         log.info("Checking user info by nickname..");
+        String nickname = userDetails.getUsername();
         if (nickname == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
         }
@@ -104,9 +105,11 @@ public class UserController {
     /**
      * 소셜 로그인 성공 이후 추가 정보(역할) 업데이트 및 새로운 JWT 발급
      */
-    @PostMapping("/update-role")
-    public ResponseEntity<Map<String, String>> updateUserRole(@AuthenticationPrincipal String nickname, @RequestBody Map<String, String> requestBody) {
+    @PostMapping("/unknown/update-role")
+    public ResponseEntity<Map<String, String>> updateUserRole(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails, @RequestBody Map<String, String> requestBody) {
+
         log.info("Update user role by nickname..");
+        String nickname = userDetails.getUsername();
         if (nickname == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
         }
@@ -130,11 +133,11 @@ public class UserController {
         }
 
         // 2. CustomOAuth2UserDetails 객체를 생성
-        CustomOAuth2UserDetails userDetails = new CustomOAuth2UserDetails(updatedUser);
+        CustomOAuth2UserDetails newUserDetails = new CustomOAuth2UserDetails(updatedUser);
 
         // 이 객체를 이용해 UsernamePasswordAuthenticationToken 기반의 Authentication 객체 생성
         Authentication authentication = new UsernamePasswordAuthenticationToken(
-                userDetails, null, userDetails.getAuthorities()
+                newUserDetails, null, newUserDetails.getAuthorities()
         );
 
         // 3. 새로운 JWT 토큰 발급
