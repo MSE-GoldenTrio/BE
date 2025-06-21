@@ -1,4 +1,4 @@
-package com.example.iplan.config.jwt;
+package com.example.iplan.auth.jwt;
 
 import com.example.iplan.auth.UserRole;
 import com.example.iplan.auth.Users;
@@ -22,8 +22,12 @@ import java.util.*;
 public class JwtTokenProvider {
     private final Key key;
 
-    private static final long ACCESS_TOKEN_EXPIRATION = 86400000L; // 24시간
-    private static final long REFRESH_TOKEN_EXPIRATION = 604800000L; // 7일
+    public static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24; // 24시간
+    public static final long REFRESH_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24 * 30; // 30일
+
+    // 테스트용
+//    public static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 2;  // 2분
+//    public static final long REFRESH_TOKEN_EXPIRATION = 1000L * 60 * 5; // 5분
 
     // application.yml에서 secret 값 가져와서 key에 저장
     public JwtTokenProvider(@Value("${jwt.secret}") String secretKey) {
@@ -157,6 +161,35 @@ public class JwtTokenProvider {
         } catch (ExpiredJwtException e) {
             return e.getClaims();
         }
+    }
+
+    // 토큰의 nickname(subject)을 가져옴
+    public String getUserNickname(String token) {
+        return parseClaims(token).getSubject();
+    }
+
+    // 토큰의 만료시간 가져옴
+    public Date getExpirationDate(String token) {
+        return parseClaims(token).getExpiration();
+    }
+
+    public String generateAccessToken(Authentication authentication) {
+        CustomOAuth2UserDetails userDetails = (CustomOAuth2UserDetails) authentication.getPrincipal();
+
+        String nickname = userDetails.getUser().getNickname();
+        List<String> linked_id = userDetails.getUser().getLinked_id();
+        UserRole role = userDetails.getUser().getAuthority();
+
+        long now = System.currentTimeMillis();
+        Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRATION);
+
+        return Jwts.builder()
+                .setSubject(nickname)
+                .claim("role", role.name())
+                .claim("linked_id", linked_id)
+                .setExpiration(accessTokenExpiresIn)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
     }
 
 }
