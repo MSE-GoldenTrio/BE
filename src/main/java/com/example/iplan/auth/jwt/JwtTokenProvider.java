@@ -1,13 +1,18 @@
 package com.example.iplan.auth.jwt;
 
+import com.example.iplan.ExceptionHandler.CustomException;
+import com.example.iplan.auth.ExceptionHandler.CustomAuthenticationException;
 import com.example.iplan.auth.UserRole;
 import com.example.iplan.auth.Users;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
+import com.example.iplan.auth.redis.Blacklist;
+import com.example.iplan.auth.redis.BlacklistRepository;
+import com.example.iplan.auth.redis.RefreshTokenService;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -20,19 +25,30 @@ import java.util.*;
 @Slf4j
 @Component
 public class JwtTokenProvider {
+
     private final Key key;
+    private final RefreshTokenService refreshTokenService;
+    private final BlacklistRepository blacklistRepository;
 
-    public static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24; // 24시간
-    public static final long REFRESH_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24 * 30; // 30일
+    private final long accessTokenExpiration;
+    private final long refreshTokenExpiration;
 
-    // 테스트용
-//    public static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 2;  // 2분
-//    public static final long REFRESH_TOKEN_EXPIRATION = 1000L * 60 * 5; // 5분
+//    public static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24; // 24시간
+//    public static final long REFRESH_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24 * 30; // 30일
 
-    // application.yml에서 secret 값 가져와서 key에 저장
-    public JwtTokenProvider(@Value("${jwt.secret}") String secretKey) {
-        log.info("key:"+secretKey);
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+    // JwtProperties 를 통해 생성자 내부에서 key 를 초기화
+    public JwtTokenProvider(
+            RefreshTokenService refreshTokenService,
+            BlacklistRepository blacklistRepository,
+            JwtProperties jwtProperties
+    ) {
+        this.refreshTokenService = refreshTokenService;
+        this.blacklistRepository = blacklistRepository;
+
+        this.accessTokenExpiration = jwtProperties.getAccessTokenExpiration();
+        this.refreshTokenExpiration = jwtProperties.getRefreshTokenExpiration();
+
+        byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecret());
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
@@ -43,8 +59,8 @@ public class JwtTokenProvider {
         }
 
         CustomOAuth2UserDetails userDetails = (CustomOAuth2UserDetails) authentication.getPrincipal();
-
-        String nickname = userDetails.getUser().getNickname();
+        String nickname = userDetails.getUsername();
+        String email = userDetails.getEmail();
         List<String> linked_id = userDetails.getUser().getLinked_id();
 
         // 사용자 권한 리스트 추출 (ROLE_CHILD, ROLE_PARENT → CHILD, PARENT 변환)
@@ -57,14 +73,15 @@ public class JwtTokenProvider {
         // 이때, 문자열이 아니라 Enum 값(CHILD, PARENT)을 저장하려면 UserRole.fromString()을 사용해 변환
         UserRole role = UserRole.fromString(roleString); // 문자열을 Enum(UserRole)로 변환
 
-        log.info("User nickname: {}, role: {}, linked_id: {}", nickname, role, linked_id);
+        log.info("User nickname: {}, email: {}, role: {}, linked_id: {}", nickname, email, role, linked_id);
 
         long now = (new Date()).getTime();
 
         // Access Token 생성
-        Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRATION);
+        Date accessTokenExpiresIn = new Date(now + accessTokenExpiration);
         String accessToken = Jwts.builder()
                 .setSubject(nickname)
+                .claim("email", email)
                 .claim("role", role.name()) // Enum 값 저장 (CHILD, PARENT)
                 .claim("linked_id", linked_id)  // 리스트로 저장
                 .setExpiration(accessTokenExpiresIn)
@@ -72,7 +89,7 @@ public class JwtTokenProvider {
                 .compact();
 
         // Refresh Token 생성
-        Date refreshTokenExpiresIn = new Date(now + REFRESH_TOKEN_EXPIRATION);
+        Date refreshTokenExpiresIn = new Date(now + refreshTokenExpiration);
         String refreshToken = Jwts.builder()
                 .setExpiration(refreshTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -93,6 +110,7 @@ public class JwtTokenProvider {
         log.info("claim.getSubject is 'Nickname' = {}", claims.getSubject());
 
         String nickname = claims.getSubject();
+        String email = (String) claims.get("email");
         List<String> linked_id = claims.get("linked_id", List.class); // claim 없으면 null 반환
 
         // role 정보가 없는 경우 예외 처리
@@ -113,7 +131,7 @@ public class JwtTokenProvider {
         CustomOAuth2UserDetails principal = new CustomOAuth2UserDetails(
                 Users.builder()
                         .name("")
-                        .email("")
+                        .email(email)
                         .nickname(nickname)  // 토큰에서 추출한..
                         .password("")
                         .authority(role)    // Enum 값 그대로 사용
@@ -149,6 +167,21 @@ public class JwtTokenProvider {
         return false;
     }
 
+    // AccessToken 유효성 검증 - 블랙리스트에 있는지
+    public void verifyAccessToken(String token) throws CustomAuthenticationException {
+        // 1. 유효성 검사
+        if (!validateToken(token)) {
+            throw new CustomAuthenticationException("유효하지 않은 Access Token입니다.", HttpStatus.UNAUTHORIZED);
+        }
+
+        // 2. 블랙리스트 조회
+        String nickname = getUserNickname(token);
+        Optional<Blacklist> blacklisted = blacklistRepository.findById(nickname);
+
+        if (blacklisted.isPresent()) {
+            throw new CustomAuthenticationException("이미 로그아웃된 사용자입니다.", HttpStatus.UNAUTHORIZED);
+        }
+    }
 
     // 토큰에서 Claims 추출 (만료된 토큰도 처리)
     private Claims parseClaims(String accessToken) { //토큰 파싱, 검증 수행
@@ -173,18 +206,21 @@ public class JwtTokenProvider {
         return parseClaims(token).getExpiration();
     }
 
-    public String generateAccessToken(Authentication authentication) {
+    // AccessToken 재발급
+    public String generateNewAccessToken(Authentication authentication) {
         CustomOAuth2UserDetails userDetails = (CustomOAuth2UserDetails) authentication.getPrincipal();
 
         String nickname = userDetails.getUser().getNickname();
+        String email = userDetails.getUser().getEmail();
         List<String> linked_id = userDetails.getUser().getLinked_id();
         UserRole role = userDetails.getUser().getAuthority();
 
         long now = System.currentTimeMillis();
-        Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRATION);
+        Date accessTokenExpiresIn = new Date(now + accessTokenExpiration);
 
         return Jwts.builder()
                 .setSubject(nickname)
+                .claim("email", email)
                 .claim("role", role.name())
                 .claim("linked_id", linked_id)
                 .setExpiration(accessTokenExpiresIn)
@@ -192,4 +228,21 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public void destroyToken(String accessToken) {
+        // 1. nickname 추출
+        String nickname = getUserNickname(accessToken);
+
+        // 2. Redis에서 RefreshToken 삭제
+        refreshTokenService.deleteToken(nickname);
+
+        // 3. accessToken 만료 시간 계산 → 현재 시간과의 차이로 TTL 계산
+        Date expirationDate = getExpirationDate(accessToken);
+        long now = System.currentTimeMillis();
+        long remainingMillis = expirationDate.getTime() - now;
+        long remainingMinutes = Math.max(1, remainingMillis / 1000 / 60); // 최소 1분
+
+        // 4. 블랙리스트 등록
+        Blacklist blacklist = new Blacklist(nickname, accessToken, "logout", remainingMinutes);
+        blacklistRepository.save(blacklist);
+    }
 }
