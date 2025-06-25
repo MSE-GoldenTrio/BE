@@ -23,14 +23,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-/**
- * 특정 날짜의 단일 계획들에 대한 컨트롤러
- */
 @Tag(name = "Plan CRUD", description = "아이 화면에서 계획을 추가하고, 확인하고, 수정하고, 삭제합니다.")
 @Slf4j
 @RequiredArgsConstructor
 @Controller
-@RequestMapping("/plan")
+@RequestMapping("child/plan")
 public class PlanChildController {
 
     private final PlanChildService planChildService;
@@ -55,25 +52,6 @@ public class PlanChildController {
 
         String childNickname = user.getUsername();
         return planChildService.postChildNewPlan(request, childNickname);
-    }
-
-    /**
-     * (목표 탭 클릭시)추가된 계획 리스트를 전부 보여준다.(계획 제목만)
-     * @return
-     * @throws ExecutionException
-     * @throws InterruptedException
-     */
-    @Operation(summary = "당일 계획 리스트 GET", description = "(목표 탭 클릭시)추가된 계획 리스트를 전부 보여준다.(계획 제목만)",
-            parameters = {
-                    @Parameter(name = "targetDate", description = "원하는 년/월/일", example = "2025-01-15", required = true)
-            })
-    @GetMapping("/dayPlanListTitle/{targetDate}")
-    public ResponseEntity<Map<String, Object>> showPlanList
-    (@AuthenticationPrincipal CustomOAuth2UserDetails user,
-     @PathVariable @Parameter(description = "원하는 년/월/일", example = "2025-01-15") String targetDate) throws ExecutionException, InterruptedException {
-        String childNickname = user.getUsername();
-        Map<String, Object> response = planChildService.findAllPlanList(childNickname, targetDate);
-        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     /**

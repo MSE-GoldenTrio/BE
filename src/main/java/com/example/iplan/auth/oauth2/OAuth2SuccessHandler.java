@@ -1,8 +1,8 @@
 package com.example.iplan.auth.oauth2;
 
 import com.example.iplan.auth.Users;
-import com.example.iplan.config.jwt.JwtToken;
-import com.example.iplan.config.jwt.JwtTokenProvider;
+import com.example.iplan.auth.jwt.JwtToken;
+import com.example.iplan.auth.jwt.JwtTokenProvider;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

@@ -2,8 +2,8 @@ package com.example.iplan.config;
 
 import com.example.iplan.auth.oauth2.CustomOAuth2UserService;
 import com.example.iplan.auth.oauth2.OAuth2SuccessHandler;
-import com.example.iplan.config.jwt.JwtAuthenticationFilter;
-import com.example.iplan.config.jwt.JwtTokenProvider;
+import com.example.iplan.auth.jwt.JwtAuthenticationFilter;
+import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +58,9 @@ public class SecurityConfig{
                                 // Swagger 및 API 문서 접근 허용
                                 .requestMatchers(new AntPathRequestMatcher("/swagger-ui/**")).permitAll()
                                 .requestMatchers(new AntPathRequestMatcher("/v3/api-docs/**")).permitAll()
+
+                                // 'unknown' 유저만 접근 가능
+                                .requestMatchers(new AntPathRequestMatcher("/api/unknown/**")).hasRole("UNKNOWN")
 
                                 // 'child' 권한이 있어야 접근 가능
                                 .requestMatchers(new AntPathRequestMatcher("/api/child/**")).hasRole("CHILD")
