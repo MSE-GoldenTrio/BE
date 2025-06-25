@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 @RedisHash(value = "refreshToken", timeToLive = 600)//단위는 초임
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserRefreshToken {
+public class RefreshToken {
     @Id
     private String id;
 
@@ -25,7 +25,7 @@ public class UserRefreshToken {
     @TimeToLive(unit = TimeUnit.MINUTES)
     private Long expiration;
 
-    public UserRefreshToken(CustomOAuth2UserDetails userDetails, String refreshToken, Long expiration){
+    public RefreshToken(CustomOAuth2UserDetails userDetails, String refreshToken, Long expiration){
         this.id = userDetails.getUsername();    // 사용자 닉네임이 식별자
         this.refreshToken = refreshToken;
         this.expiration = expiration;
