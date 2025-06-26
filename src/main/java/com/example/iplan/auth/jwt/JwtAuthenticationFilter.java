@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.GenericFilterBean;
 
@@ -23,12 +25,14 @@ import java.io.IOException;
 @Slf4j
 public class JwtAuthenticationFilter extends GenericFilterBean {
     private final JwtTokenProvider jwtTokenProvider;
+    private final AuthenticationEntryPoint authenticationEntryPoint;
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         log.info("Checking JWT token in JwtAuthenticationFilter...");
 
         HttpServletRequest httpRequest = (HttpServletRequest) request;
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
         String path = httpRequest.getRequestURI();
 
         // Swagger UI 경로는 JWT 토큰 검증을 하지 않도록 예외 처리
@@ -37,23 +41,31 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
             return;
         }
 
-        // 1. Request Header 에서 JWT 토큰 추출
-        String token = resolveToken(httpRequest);
-        log.info("JWT token: {}", token);
+        try {
+            // 1. Request Header 에서 JWT 토큰 추출
+            String token = resolveToken(httpRequest);
+            log.info("JWT token: {}", token);
 
-        // 2. validateToken 으로 JWT 토큰 유효성 검사
-        // 이때 예외 발생 시 오류(CustomAuthenticationException)를 직접 catch 하지 않고, 예외를 던지면 (Custom)AuthenticationEntryPoint 가 처리함
-        if (token != null) {
-            // AccessToken 유효성 + 블랙리스트 검사 포함
-            jwtTokenProvider.verifyAccessToken(token);
+            // 2. validateToken 으로 JWT 토큰 유효성 검사
+            // 이때 예외 발생 시 오류(CustomAuthenticationException)를 직접 catch 하지 않고, 예외를 던지면 (Custom)AuthenticationEntryPoint 가 처리함
+            if (token != null) {
+                // AccessToken 유효성 + 블랙리스트 검사 포함
+                jwtTokenProvider.verifyAccessToken(token);  // 유효하지 않으면 예외 발생
 
-            Authentication authentication = jwtTokenProvider.getAuthentication(token);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            log.info("Authentication set in SecurityContext");
+                Authentication authentication = jwtTokenProvider.getAuthentication(token);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                log.info("Authentication set in SecurityContext");
+            }
+
+            // 토큰이 없거나 유효한 경우 → 다음 필터로 넘김
+            chain.doFilter(request, response);
+        } catch (AuthenticationException ex) {
+            // SecurityContext 초기화
+            SecurityContextHolder.clearContext();
+            // AuthenticationEntryPoint 직접 호출
+            authenticationEntryPoint.commence(httpRequest, httpResponse, ex);
         }
 
-        // 토큰이 없거나 유효한 경우 → 다음 필터로 넘김
-        chain.doFilter(request, response);
     }
 
     // Request Header 에서 토큰 추출
