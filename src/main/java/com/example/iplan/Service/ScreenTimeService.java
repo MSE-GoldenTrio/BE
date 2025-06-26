@@ -7,6 +7,7 @@ import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.GetScreenTimeOCRRepository;
 import com.example.iplan.Repository.InstalledAppsRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
+import com.example.iplan.config.GoogleConfig;
 import com.example.iplan.util.SimplePair;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.vision.v1.*;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.awt.*;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,6 +47,8 @@ public class ScreenTimeService {
     private final GetScreenTimeOCRRepository getScreenTimeOCRRepository;
 
     private final InstalledAppsRepository installedAppsRepository;
+
+    private final GoogleConfig googleConfig;
 
     private static final String KEY_DATE = "date";
     private static final String KEY_MAIN_TIME = "mainTime";
@@ -235,9 +239,8 @@ public class ScreenTimeService {
         try (ImageAnnotatorClient client = ImageAnnotatorClient.create(
                 ImageAnnotatorSettings.newBuilder()
                         .setCredentialsProvider(() ->
-                                GoogleCredentials.fromStream(
-                                        new ClassPathResource("iplan-3e9c2-feef2236cd5b.json").getInputStream()
-                                )
+                                GoogleCredentials.fromStream(new FileInputStream(googleConfig.getCredentials()))
+
                         ).build()
         )) {
             AnnotateImageResponse response = client.batchAnnotateImages(
