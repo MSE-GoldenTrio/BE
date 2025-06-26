@@ -1,18 +1,4 @@
 services:
-  app:
-    image: zyerin/iplan1
-    ports:
-      - "8083:8080"
-    environment:
-      - FIREBASE_CONFIG_PATH=/app/iplan-firebase.json
-
-  app2:
-    image: hanna406/iplan-demo
-    ports:
-      - "8080:8080"
-    environment:
-      - FIREBASE_CONFIG_PATH=/app/iplan-firebase.json
-
   app3:
     image: hanni/test1
     ports:
