@@ -150,4 +150,41 @@ public class UserController {
                 "accessToken", newToken.getAccessToken()
         ));
     }
+
+    /**
+     * 로그인이 되어있는 사용자가 비밀번호를 변경하려고 할 때
+     * @param userDetails
+     * @return
+     */
+    @PostMapping("/auth/change-password")
+    public ResponseEntity<?> changePassword(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails){
+        String email = userDetails.getUsername();
+        //userService.changePassword(userDetails.getEmail(), currentPassword, newPassword);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "비밀번호 변경에 성공했습니다."
+        ));
+    }
+
+    /**
+     * 비밀번호를 잊은 사용자가 비밀번호를 재설정 하려고 할 때
+     * @param payload
+     * @return
+     */
+    @PostMapping("/auth/reset-password-request")
+    public ResponseEntity<?> requestReset(@RequestBody Map<String, String> payload){
+        String email = payload.get("email");
+        Users user = userService.findByEmail(email);
+
+        if(user != null)
+        {
+            //passwordResetService.sendRequestLink(email);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "비밀번호 재설정 링크를 보냈습니다. 메일을 확인해 주세요."
+            ));
+        }else{
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "User not found"));
+        }
+    }
 }

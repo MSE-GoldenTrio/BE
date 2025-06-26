@@ -116,6 +116,11 @@ public class UserService {
         return user.orElse(null); // 사용자 없을 경우 null 반환
     }
 
+    public Users findByEmail(String email){
+        Optional<Users> user = userRepository.findByEmail(email);
+        return user.orElse(null);
+    }
+
     /**
      * 아이디(닉네임 중복 체크
      */
