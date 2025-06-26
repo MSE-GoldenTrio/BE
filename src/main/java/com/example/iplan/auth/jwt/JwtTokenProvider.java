@@ -175,10 +175,11 @@ public class JwtTokenProvider {
         }
 
         // 2. 블랙리스트 조회
-        String nickname = getUserNickname(token);
-        Optional<Blacklist> blacklisted = blacklistRepository.findById(nickname);
+        Optional<Blacklist> blacklisted = blacklistRepository.findById(token);
+        log.info("블랙리스트 조회 완료");
 
         if (blacklisted.isPresent()) {
+            log.info("블랙리스트에 사용자 존재!!");
             throw new CustomAuthenticationException("이미 로그아웃된 사용자입니다.", HttpStatus.UNAUTHORIZED);
         }
     }
@@ -242,7 +243,8 @@ public class JwtTokenProvider {
         long remainingMinutes = Math.max(1, remainingMillis / 1000 / 60); // 최소 1분
 
         // 4. 블랙리스트 등록
-        Blacklist blacklist = new Blacklist(nickname, accessToken, "logout", remainingMinutes);
+        Blacklist blacklist = new Blacklist(accessToken, "logout", remainingMinutes);
         blacklistRepository.save(blacklist);
+        log.info("{} 사용자 토큰 블랙리스트 등록 완료: {}", nickname, accessToken);
     }
 }
