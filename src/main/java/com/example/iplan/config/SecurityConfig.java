@@ -53,7 +53,7 @@ public class SecurityConfig{
                 // addFilterBefore({등록할 필터}, {특정 필터}) -> 특정 필터 앞에 등록할 필터를 추가
                 // JWT 인증 필터 추가
 //                .addFilterBefore(new JwtTokenFilter(firebaseAuth), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, customAuthenticationEntryPoint), UsernamePasswordAuthenticationFilter.class)
 
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
