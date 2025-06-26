@@ -22,29 +22,10 @@ public class FirebaseConfig {
     /**
      * Firebase 서비스 전반의 기본적인 초기화 역할을 한다.
      * Firebase SDK의 모든 서비스(Auth, Firestore, Storage)를 구성하고 애플리케이션에서 사용할 수 있도록 함
-     * @return
-     * @throws IOException
      */
     @Bean
     public FirebaseApp firebaseApp() throws IOException {
-        String configPath;
-
-        // Docker 환경에서는 환경 변수에서 경로를 읽고, 로컬 환경에서는 yml에서 읽는다.
-        if (System.getenv("FIREBASE_CONFIG_PATH") != null) {
-            // Docker 환경
-            System.out.println("도커 환경: "+ System.getenv("FIREBASE_CONFIG_PATH"));
-            configPath = System.getenv("FIREBASE_CONFIG_PATH");
-        } else {
-            // 로컬 환경 (application.yml의 값 사용)
-            System.out.println("환경변수 null임: "+ firebaseConfigPath);
-            configPath = firebaseConfigPath;
-        }
-        
-        if (configPath == null) {
-            throw new IOException("Firebase config path is not set.");
-        }
-    
-        FileInputStream serviceAccount = new FileInputStream(configPath);
+        FileInputStream serviceAccount = new FileInputStream(firebaseConfigPath);
 
         FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(serviceAccount))
