@@ -1,5 +1,8 @@
 package com.example.iplan.config;
 
+import com.example.iplan.auth.CustomLogoutHandler;
+import com.example.iplan.auth.ExceptionHandler.CustomAccessDeniedHandler;
+import com.example.iplan.auth.ExceptionHandler.CustomAuthenticationEntryPoint;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserService;
 import com.example.iplan.auth.oauth2.OAuth2SuccessHandler;
 import com.example.iplan.auth.jwt.JwtAuthenticationFilter;
@@ -32,6 +35,9 @@ public class SecurityConfig{
     private final FirebaseAuth firebaseAuth;
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final CustomLogoutHandler customLogoutHandler;
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
@@ -47,7 +53,7 @@ public class SecurityConfig{
                 // addFilterBefore({등록할 필터}, {특정 필터}) -> 특정 필터 앞에 등록할 필터를 추가
                 // JWT 인증 필터 추가
 //                .addFilterBefore(new JwtTokenFilter(firebaseAuth), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, customAuthenticationEntryPoint), UsernamePasswordAuthenticationFilter.class)
 
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
@@ -63,10 +69,10 @@ public class SecurityConfig{
                                 .requestMatchers(new AntPathRequestMatcher("/api/unknown/**")).hasRole("UNKNOWN")
 
                                 // 'child' 권한이 있어야 접근 가능
-                                .requestMatchers(new AntPathRequestMatcher("/api/child/**")).hasRole("CHILD")
+                                .requestMatchers(new AntPathRequestMatcher("/child/**")).hasRole("CHILD")
 
                                 // 'parent' 권한이 있어야 접근 가능
-                                .requestMatchers(new AntPathRequestMatcher("/api/parent/**")).hasRole("PARENT")
+                                .requestMatchers(new AntPathRequestMatcher("/parent/**")).hasRole("PARENT")
 
                                 // 나머지 요청은 인증 필요
                                 .anyRequest().authenticated()
@@ -82,8 +88,17 @@ public class SecurityConfig{
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler) // 로그인 성공 핸들러
                 )
-
-                .logout(logout -> logout.disable());
+                // 로그아웃 설정
+                .logout(logout -> logout
+                        .logoutUrl("/api/auth/logout") // 클라이언트에서 호출할 로그아웃 엔드포인트
+                        .addLogoutHandler(customLogoutHandler)
+                        .logoutSuccessHandler(customLogoutHandler)
+                )
+                // 예외 핸들러
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .authenticationEntryPoint(customAuthenticationEntryPoint) // 인증 실패 처리
+                        .accessDeniedHandler(customAccessDeniedHandler)           // 인가 실패 처리
+                );
 
         return http.build();
     }

@@ -1,5 +1,6 @@
 package com.example.iplan.auth;
 
+import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
@@ -29,6 +30,7 @@ public class UserService {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final JwtProperties jwtProperties;
 
     // 회원가입
     public String signUp(String nickname, String password, String name, String email, String roleStr) {
@@ -93,7 +95,8 @@ public class UserService {
             log.info("JwtToken created: accessToken = {}, refreshToken = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
 
             // 6. Refresh 토큰 Redis 에 저장
-            long expirationMinutes = JwtTokenProvider.REFRESH_TOKEN_EXPIRATION / 1000 / 60; // ms → minutes
+            long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
+
             refreshTokenService.saveToken(
                     (CustomOAuth2UserDetails) authentication.getPrincipal(),
                     jwtToken.getRefreshToken(),
