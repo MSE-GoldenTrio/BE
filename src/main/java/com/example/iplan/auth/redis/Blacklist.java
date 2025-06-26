@@ -16,9 +16,7 @@ import java.util.concurrent.TimeUnit;
 public class Blacklist {
 
     @Id
-    private String id; // 사용자 닉네임
-
-    private String accessToken;
+    private String accessToken; // // accessToken 을 키로 사용
 
     private String reason; // 예: logout, revoked
 
