@@ -1,12 +1,14 @@
 package com.example.iplan.auth;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
@@ -19,16 +21,13 @@ public class CustomUserDetailsService implements UserDetailsService {
      */
     // UserService 의 로그인 과정에서 호출 됨 -> 디비에서 해당 이메일을 가진 사용자 조회
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userRepository.findByNickname(username)
-                .map(CustomOAuth2UserDetails::new) // CustomOAuth2UserDetails 사용
-                .orElseThrow(() -> new UsernameNotFoundException("해당하는 회원을 찾을 수 없습니다."));
+    public UserDetails loadUserByUsername(String nickname) throws UsernameNotFoundException {
+        Users user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 
-        // 아래는 일반 로그인만 지원하는 경우 (변경 전)
-//        return userRepository.findByEmail(username)
-//                .map(this::createUserDetails)   // CustomUserDetails 객체 생성 후 반환
-//                .orElseThrow(() -> new UsernameNotFoundException("해당하는 회원을 찾을 수 없습니다."));
+        log.info("Loaded user from DB: {}, {}", user.getNickname(), user.getEmail());
 
+        return new CustomOAuth2UserDetails(user);
     }
 
     /**

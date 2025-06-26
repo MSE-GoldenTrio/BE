@@ -1,11 +1,12 @@
 package com.example.iplan.auth;
 
 import com.example.iplan.auth.DTO.TokenRefreshRequestDTO;
+import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.RefreshTokenService;
-import com.example.iplan.auth.redis.UserRefreshToken;
+import com.example.iplan.auth.redis.RefreshToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,8 +23,16 @@ import java.util.Optional;
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    private final JwtProperties jwtProperties;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
+        String accessToken = authHeader.replace("Bearer ", "");
+        jwtTokenProvider.destroyToken(accessToken);
+        return ResponseEntity.ok().build();
+    }
 
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshAccessToken(@RequestBody TokenRefreshRequestDTO request) {
@@ -39,12 +48,14 @@ public class AuthController {
         }
 
         // 2. Redis에서 refreshToken 조회 및 검증
-        Optional<UserRefreshToken> optional = refreshTokenService.getToken(nickname);
+        Optional<RefreshToken> optional = refreshTokenService.getToken(nickname);
+      
         if (optional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("RefreshToken이 만료되었거나 존재하지 않습니다. 다시 로그인 해주세요.");
         }
 
-        UserRefreshToken savedToken = optional.get();
+        RefreshToken savedToken = optional.get();
+
         if (!savedToken.getRefreshToken().equals(refreshToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("RefreshToken이 일치하지 않습니다. 다시 로그인 해주세요.");
         }
@@ -56,9 +67,9 @@ public class AuthController {
         Date expirationDate = jwtTokenProvider.getExpirationDate(refreshToken);
         long now = System.currentTimeMillis();
         long remainingMillis = expirationDate.getTime() - now;
-        long oneWeekMillis = 7L * 24 * 60 * 60 * 1000; // 7일
+//        long oneWeekMillis = 7L * 24 * 60 * 60 * 1000; // 7일
         // 테스트용: 1분으로 설정
-//        long oneWeekMillis = 60 * 1000;
+        long oneWeekMillis = 60 * 1000;
 
         // 5. accessToken 은 항상 새로 발급
         // 6. refreshToken 은 조건에 따라 새로 발급하거나 유지
@@ -67,11 +78,12 @@ public class AuthController {
             log.info("RefreshToken 남은 기간이 7일 이내 → 갱신 수행");
             newToken = jwtTokenProvider.generateToken(authentication);
 
-            long expirationMinutes = JwtTokenProvider.REFRESH_TOKEN_EXPIRATION / 1000 / 60;
+            long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60;
             refreshTokenService.saveToken((CustomOAuth2UserDetails) authentication.getPrincipal(), newToken.getRefreshToken(), expirationMinutes);
         } else {
             log.info("RefreshToken 충분히 남아 있음 → accessToken만 재발급");
-            String newAccessToken = jwtTokenProvider.generateAccessToken(authentication);
+            String newAccessToken = jwtTokenProvider.generateNewAccessToken(authentication);
+
             newToken = JwtToken.builder()
                     .grantType("Bearer")
                     .accessToken(newAccessToken)

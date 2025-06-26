@@ -13,7 +13,7 @@ public class RefreshTokenService {
 
     // 저장 (로그인, 토큰 재발급 시 사용)
     public void saveToken(CustomOAuth2UserDetails userDetails, String refreshToken, long expirationMinutes) {
-        UserRefreshToken token = new UserRefreshToken(userDetails, refreshToken, expirationMinutes);
+        RefreshToken token = new RefreshToken(userDetails, refreshToken, expirationMinutes);
         refreshTokenRepository.save(token);
     }
 
@@ -23,7 +23,7 @@ public class RefreshTokenService {
     }
 
     // 조회 (재발급 시 검증용)
-    public Optional<UserRefreshToken> getToken(String nickname) {
+    public Optional<RefreshToken> getToken(String nickname) {
         return refreshTokenRepository.findById(nickname);
     }
 

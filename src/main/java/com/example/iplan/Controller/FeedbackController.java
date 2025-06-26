@@ -20,13 +20,13 @@ import java.util.concurrent.ExecutionException;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/parent/feedback")
+@RequestMapping
 public class FeedbackController {
 
     private final FeedbackService feedbackService;
 
     // 아이들이 설정한 보상 지급
-    @PostMapping
+    @PostMapping("/parent/feedback")
     public ResponseEntity<Map<String, Object>> addFeedback(@RequestBody FeedbackDTO feedbackDTO, @AuthenticationPrincipal CustomOAuth2UserDetails user)
             throws ExecutionException, InterruptedException {
 
@@ -35,7 +35,7 @@ public class FeedbackController {
     }
 
     // 부모가 해당하는 아이에 대한 모든 피드백 가져옴 (child, parent 요청 모두 가능)
-    @GetMapping("/list/{childNickname}")
+    @GetMapping("/feedback/list/{childNickname}")
     public ResponseEntity<Map<String, Object>> getFeedbackParents(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String childNickname)
             throws ExecutionException, InterruptedException {
 

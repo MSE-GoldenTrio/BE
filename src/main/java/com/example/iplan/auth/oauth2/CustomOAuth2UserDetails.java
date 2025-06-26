@@ -41,6 +41,9 @@ public class CustomOAuth2UserDetails implements OAuth2User, UserDetails {
                 new SimpleGrantedAuthority(user.getAuthority().getRole())); // 사용자 권한
     }
 
+    // 사용자 이메일 가져오기
+    public String getEmail() { return user.getEmail(); }
+
     // 사용자 비밀번호 (OAuth2 로그인 시 null)
     @Override
     public String getPassword() {
