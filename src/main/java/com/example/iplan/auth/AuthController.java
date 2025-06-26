@@ -49,11 +49,13 @@ public class AuthController {
 
         // 2. Redis에서 refreshToken 조회 및 검증
         Optional<RefreshToken> optional = refreshTokenService.getToken(nickname);
+      
         if (optional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("RefreshToken이 만료되었거나 존재하지 않습니다. 다시 로그인 해주세요.");
         }
 
         RefreshToken savedToken = optional.get();
+
         if (!savedToken.getRefreshToken().equals(refreshToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("RefreshToken이 일치하지 않습니다. 다시 로그인 해주세요.");
         }
@@ -81,6 +83,7 @@ public class AuthController {
         } else {
             log.info("RefreshToken 충분히 남아 있음 → accessToken만 재발급");
             String newAccessToken = jwtTokenProvider.generateNewAccessToken(authentication);
+
             newToken = JwtToken.builder()
                     .grantType("Bearer")
                     .accessToken(newAccessToken)

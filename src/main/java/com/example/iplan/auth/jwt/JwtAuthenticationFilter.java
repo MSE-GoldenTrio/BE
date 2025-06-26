@@ -40,7 +40,6 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
             chain.doFilter(request, response);
             return;
         }
-
         try {
             // 1. Request Header 에서 JWT 토큰 추출
             String token = resolveToken(httpRequest);
@@ -65,7 +64,6 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
             // AuthenticationEntryPoint 직접 호출
             authenticationEntryPoint.commence(httpRequest, httpResponse, ex);
         }
-
     }
 
     // Request Header 에서 토큰 추출

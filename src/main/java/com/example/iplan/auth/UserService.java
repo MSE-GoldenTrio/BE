@@ -96,6 +96,7 @@ public class UserService {
 
             // 6. Refresh 토큰 Redis 에 저장
             long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
+
             refreshTokenService.saveToken(
                     (CustomOAuth2UserDetails) authentication.getPrincipal(),
                     jwtToken.getRefreshToken(),
