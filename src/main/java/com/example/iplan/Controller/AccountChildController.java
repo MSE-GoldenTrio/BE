@@ -2,9 +2,7 @@ package com.example.iplan.Controller;
 
 import com.example.iplan.DTO.AccountRequestDTO;
 import com.example.iplan.ExceptionHandler.CustomException;
-import com.example.iplan.Repository.AccountRepository;
 import com.example.iplan.Service.AccountChildService;
-import com.example.iplan.Service.AccountParentService;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.stereotype.Controller;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,14 +21,13 @@ import java.util.concurrent.ExecutionException;
 @Tag(name = "Child Account CRUD", description = "아이들의 계정 연동 관련 api 요청")
 @Slf4j
 @RequiredArgsConstructor
-@Controller
+@RestController
 @Validated
 @RequestMapping("/api/child")
 public class AccountChildController {
     private final AccountChildService accountChildService;
 
     @GetMapping("/pending-requests")
-    @ResponseBody
     public ResponseEntity<Map<String, Object>> getChildPendingRequests(@AuthenticationPrincipal CustomOAuth2UserDetails user) {
         Map<String, Object> response = new HashMap<>();
         log.info("Account API from child received!");

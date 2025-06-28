@@ -24,7 +24,7 @@ import java.util.concurrent.ExecutionException;
 @Tag(name = "Parent Account CRUD", description = "부모님의 계정 연동 관련 api 요청")
 @Slf4j
 @RequiredArgsConstructor
-@Controller
+@RestController
 @Validated
 @RequestMapping("/api/parent")
 public class AccountParentController {
@@ -33,7 +33,6 @@ public class AccountParentController {
 
     @Operation(summary = "부모가 아이 계정 연동 요청을 보냄 POST", description = "해당 요청을 PendingAccountRequest 저장")
     @PostMapping("/link-child")
-    @ResponseBody
     public ResponseEntity<Map<String, Object>> parentAccountRequest(@RequestBody @NotNull AccountRequestDTO requestDTO, @AuthenticationPrincipal CustomOAuth2UserDetails user)
             throws ExecutionException, InterruptedException {
         log.info("Account API from parent received!");

@@ -18,11 +18,12 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-@Controller
+@RestController
 @RequiredArgsConstructor
 @RequestMapping("/calendar")
 @Tag(name = "달력 페이지 컨트롤러", description = "선택한 한달 간의 데이터를 처리, 관리한다.")
