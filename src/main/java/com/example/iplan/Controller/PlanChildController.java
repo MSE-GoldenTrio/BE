@@ -27,7 +27,7 @@ import java.util.concurrent.ExecutionException;
 @Slf4j
 @RequiredArgsConstructor
 @Controller
-@RequestMapping("child/plan")
+@RequestMapping("/child/plan")
 public class PlanChildController {
 
     private final PlanChildService planChildService;
@@ -48,7 +48,7 @@ public class PlanChildController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> additionPlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal CustomOAuth2UserDetails user)
             throws ExecutionException, InterruptedException {
-        log.info("Child plan addition API received!");
+        System.out.println("Child plan addition API received!");
 
         String childNickname = user.getUsername();
         return planChildService.postChildNewPlan(request, childNickname);
