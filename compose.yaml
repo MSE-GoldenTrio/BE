@@ -1,25 +1,27 @@
 services:
-  app:
-    image: zyerin/iplan1
+  redis:
+    image: redis
+    container_name: rediscont
+    networks:
+      - myboot
     ports:
-      - "8083:8080"
-    environment:
-      - FIREBASE_CONFIG_PATH=/app/iplan-firebase.json
+      - "6379:6379"
+    restart: always
 
-  app2:
+  iplan-server:
     image: hanna406/iplan-demo
+    container_name: iplancont
     ports:
       - "8080:8080"
-    environment:
-      - FIREBASE_CONFIG_PATH=/app/iplan-firebase.json
-
-  app3:
-    image: hanni/test1
-    ports:
-      - "8082:8080"
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/iplan-3e9c2-feef2236cd5b.json
       - FIREBASE_CONFIG_PATH=/app/iplan-firebase.json
     volumes:
-      - ./src/main/resources/iplan-3e9c2-feef2236cd5b.json:/app/iplan-3e9c2-feef2236cd5b.json
-      - ./src/main/resources/iplan-firebase.json:/app/iplan-firebase.json
+      - /home/ubuntu/iplan-3e9c2-feef2236cd5b.json:/app/iplan-3e9c2-feef2236cd5b.json
+      - /home/ubuntu/iplan-firebase.json:/app/iplan-firebase.json
+    networks:
+      - myboot
+
+networks:
+  myboot:
+    driver: bridge
