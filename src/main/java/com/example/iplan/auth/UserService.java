@@ -1,10 +1,14 @@
 package com.example.iplan.auth;
 
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.RefreshTokenService;
+import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.QueryDocumentSnapshot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -18,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
@@ -25,6 +30,7 @@ import java.util.concurrent.ExecutionException;
 @RequiredArgsConstructor
 @Slf4j
 public class UserService {
+    private final Firestore firestore;
     private final UserRepository userRepository;
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
     private final JwtTokenProvider jwtTokenProvider;
@@ -158,6 +164,37 @@ public class UserService {
             log.error("Error..{}", e.getMessage());
             throw new RuntimeException("사용자 역할 업데이트 처리 중 오류 발생", e);
         }
+    }
+
+    /**
+     * 해당 이메일 사용자를 찾아서 비밀번호를 변경한다.
+     * 비밀번호는 암호화처리 후 저장
+     * @param email
+     * @param rawPassword
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void updatePasswordByEmail(String email, String rawPassword) throws ExecutionException, InterruptedException {
+        String encoded = passwordEncoder.encode(rawPassword);
+
+        List<QueryDocumentSnapshot> docs = firestore.collection("User")
+                .whereEqualTo("email", email)
+                .get()
+                .get()
+                .getDocuments();
+
+        for (DocumentSnapshot doc : docs) {
+            try {
+                firestore.collection("User")
+                        .document(doc.getId())
+                        .update("password", encoded)
+                        .get();
+            } catch (InterruptedException | ExecutionException e) {
+                System.out.println("업데이트 실패: " + e.getMessage());
+                throw new CustomException("비밀번호 변경 실패", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        }
+
     }
 }
 
