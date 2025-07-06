@@ -46,7 +46,7 @@ public class PlanChildController {
     @PostMapping("/addition")
     public ResponseEntity<Map<String, Object>> additionPlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal CustomOAuth2UserDetails user)
             throws ExecutionException, InterruptedException {
-        log.info("Child plan addition API received!");
+        System.out.println("Child plan addition API received!");
 
         String childNickname = user.getUsername();
         return planChildService.postChildNewPlan(request, childNickname);

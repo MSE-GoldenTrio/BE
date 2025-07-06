@@ -1,5 +1,6 @@
 package com.example.iplan.auth;
 
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.auth.DTO.SignInDTO;
 import com.example.iplan.auth.DTO.SignUpDTO;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
@@ -11,15 +12,19 @@ import com.google.firebase.auth.FirebaseToken;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequiredArgsConstructor
@@ -27,6 +32,7 @@ import java.util.Map;
 @RequestMapping("/api")
 public class UserController {
     private final UserService userService;
+    private final PasswordResetService passwordResetService;
     private final JwtTokenProvider jwtTokenProvider;
 
     @PostMapping("/auth/register")
@@ -169,4 +175,104 @@ public class UserController {
                 "accessToken", newToken.getAccessToken()
         ));
     }
+
+    /**
+     * 로그인이 되어있는 사용자가 비밀번호를 변경하려고 할 때
+     * @param userDetails
+     * @return
+     */
+    @GetMapping("/change-password")
+    public ResponseEntity<?> changePassword(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails) {
+        System.out.println("컨트롤러 진입");
+        if (userDetails == null) {
+            System.out.println("인증 사용자 정보가 존재하지 않습니다.");
+            throw new CustomException("인증 정보가 유효하지 않습니다. 다시 로그인 해주세요.", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            String email = userDetails.getEmail();
+            System.out.println("비밀번호 변경 요청 이메일: " + email);
+            passwordResetService.sendResetLink(email);
+            return ResponseEntity.ok(Map.of("message", "이메일 전송에 성공했습니다."));
+        } catch (Exception e) {
+            System.out.println("예외 발생: " + e.getMessage());
+            throw new CustomException("서버 오류가 발생했습니다: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
+    /**
+     * 비밀번호를 잊은 사용자가 비밀번호를 재설정 하려고 할 때
+     * @param payload
+     * @return
+     */
+    @PostMapping("/auth/reset-password-request")
+    public ResponseEntity<?> requestResetPassword(@RequestBody Map<String, String> payload) throws ExecutionException, InterruptedException {
+        String email = payload.get("email");
+        Users user = userService.findByEmail(email);
+        System.out.println("Email: " + email);
+        System.out.println("User: " + user);
+
+        if(user != null)
+        {
+            passwordResetService.sendResetLink(email);
+            return ResponseEntity.ok(Map.of(
+                    "message", "메일 전송에 성공하였습니다."
+            ));
+        }else{
+            throw new CustomException("해당 이메일에 등록된 사용자가 없습니다.", HttpStatus.NOT_FOUND);
+        }
+    }
+
+    /**
+     * 새로운 비밀번호로 재설정
+     * @param payload
+     * @return
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    @PostMapping("/auth/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> payload) throws ExecutionException, InterruptedException {
+        String token = payload.get("token");
+        String newPassword = payload.get("newPassword");
+
+        System.out.println("Token: " + token + ", New Password: " + newPassword);
+
+        passwordResetService.resetPassword(token, newPassword);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "비밀번호 변경에 성공했습니다."
+        ));
+    }
+
+    @GetMapping("/auth/reset-password-redirect")
+    public ResponseEntity<String> redirectPage(@RequestParam String token) {
+        String html = """
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>앱으로 이동 중...</title>
+          <script>
+            const token = '%s';
+            const scheme = `iplan://reset-password?token=${token}`;
+            alert("Redirecting to: " + scheme);
+            window.onload = () => {
+              setTimeout(() => {
+                window.location.href = scheme;
+              }, 1000);
+            };
+          </script>
+        </head>
+        <body>
+          <p>앱으로 이동 중입니다...</p>
+          <p>앱이 열리지 않으면 <a href="iplan://reset-password?token=%s">여기를 클릭하세요</a></p>
+        </body>
+        </html>
+        """.formatted(token, token);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(new MediaType("text", "html", StandardCharsets.UTF_8));
+        return new ResponseEntity<>(html, headers, HttpStatus.OK);
+    }
+
 }
