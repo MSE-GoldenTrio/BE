@@ -1,6 +1,5 @@
 package com.example.iplan.auth.jwt;
 
-import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.auth.ExceptionHandler.CustomAuthenticationException;
 import com.example.iplan.auth.UserRole;
 import com.example.iplan.auth.Users;
@@ -33,10 +32,7 @@ public class JwtTokenProvider {
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
 
-//    public static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24; // 24시간
-//    public static final long REFRESH_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24 * 30; // 30일
-
-    // JwtProperties 를 통해 생성자 내부에서 key 를 초기화
+    // jwtProperties 를 통해 생성자 내부에서 key 를 초기화
     public JwtTokenProvider(
             RefreshTokenService refreshTokenService,
             BlacklistRepository blacklistRepository,
@@ -229,7 +225,7 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public void destroyToken(String accessToken) {
+    public void destroyToken(String accessToken, String reason) {
         // 1. nickname 추출
         String nickname = getUserNickname(accessToken);
 
@@ -243,7 +239,7 @@ public class JwtTokenProvider {
         long remainingMinutes = Math.max(1, remainingMillis / 1000 / 60); // 최소 1분
 
         // 4. 블랙리스트 등록
-        Blacklist blacklist = new Blacklist(accessToken, "logout", remainingMinutes);
+        Blacklist blacklist = new Blacklist(accessToken, reason, remainingMinutes);
         blacklistRepository.save(blacklist);
         log.info("{} 사용자 토큰 블랙리스트 등록 완료: {}", nickname, accessToken);
     }
