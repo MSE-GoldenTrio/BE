@@ -4,6 +4,7 @@ import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.google.cloud.firestore.annotation.DocumentId;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
 
@@ -12,6 +13,7 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 
+@Slf4j
 @Component
 @Repository
 @RequiredArgsConstructor
@@ -153,6 +155,36 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         CollectionReference collection = firestore.collection(collectionName);
         ApiFuture<WriteResult> result = collection.document(getDocumentId(entity)).delete();
         result.get();
+    }
+
+    public void deleteAllByUserId(String userId) throws ExecutionException, InterruptedException {
+        CollectionReference collection = firestore.collection(collectionName);
+        QuerySnapshot querySnapshot = collection.whereEqualTo("user_id", userId).get().get();
+
+        if(querySnapshot.isEmpty()){
+            return;
+        }
+
+        WriteBatch batch = firestore.batch();
+        int cnt = 0;
+
+        for(DocumentSnapshot doc : querySnapshot.getDocuments()){
+            batch.delete(doc.getReference());
+            cnt++;
+
+            // Firestore WriteBatch는 최대 500건 제한
+            if(cnt == 500){
+                batch.commit().get(); // 실행하고
+                batch = firestore.batch(); // 새로운 배치 시작
+                cnt = 0;
+            }
+        }
+
+        if(cnt > 0){
+            batch.commit().get();
+        }
+
+        log.info("userId={}의 문서 {}건 삭제 완료", userId, querySnapshot.size());
     }
 
     /**
