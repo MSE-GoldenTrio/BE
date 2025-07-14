@@ -44,4 +44,10 @@ public class Users {
 
     @Schema(description = "사용자 기기 토큰 값", example = "abc456")
     private String fcmToken = null;
+
+    @Schema(description = "어떤 소셜 플랫폼인지에 대한 정보", example = "google")
+    private String provider;
+
+    @Schema(description = "소셜 플랫폼에서 받은 access token")
+    private String providerAccessToken;
 }
