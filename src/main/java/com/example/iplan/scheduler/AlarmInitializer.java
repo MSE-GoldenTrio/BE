@@ -3,6 +3,7 @@ package com.example.iplan.scheduler;
 import com.example.iplan.Domain.Alarm;
 import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Repository.AlarmRepository;
+import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Service.PlanChildService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,7 @@ import java.util.List;
 public class AlarmInitializer implements ApplicationListener<ApplicationReadyEvent> {
 
     private final AlarmRepository alarmRepository;
-    private final PlanChildService planChildService;
+    private final PlanChildRepository planChildRepository;
     private final PushSchedulerService pushSchedulerService;
 
     @Override
@@ -32,7 +33,7 @@ public class AlarmInitializer implements ApplicationListener<ApplicationReadyEve
             }
 
             for (Alarm alarm : alarms) {
-                PlanChild plan = planChildService.getPlanByID(alarm.getPlan_id());
+                PlanChild plan = planChildRepository.findPlanByID(alarm.getPlan_id());
 
                 if (plan != null) {
                     pushSchedulerService.schedulePushNotification(plan, alarm.getFcmToken());
