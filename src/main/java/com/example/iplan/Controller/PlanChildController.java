@@ -2,6 +2,8 @@ package com.example.iplan.Controller;
 
 import com.example.iplan.DTO.PlanChildDTO;
 import com.example.iplan.DTO.ScreenTimeDTO;
+import com.example.iplan.Domain.PlanChild;
+import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Service.PlanChildService;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.google.firebase.database.annotations.NotNull;
@@ -19,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
@@ -30,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 public class PlanChildController {
 
     private final PlanChildService planChildService;
+    private final PlanChildRepository planChildRepository;
 
     /**
      * (목표 탭에서 계획 추가하기 버튼 클릭시) 해당 날짜에 단일 계획을 추가한다
@@ -81,7 +85,12 @@ public class PlanChildController {
     @GetMapping("/detail/{documentID}")
     public ResponseEntity<Map<String, Object>> showPlanDetail
     (@PathVariable @Parameter(description = "해당 PlanChlid의 Id", example = "xicv3412zz") String documentID) throws ExecutionException, InterruptedException {
-        return planChildService.findByPlanID(documentID);
+        Map<String, Object> response = new HashMap<>();
+        PlanChild planChild = planChildRepository.findPlanByID(documentID);
+        response.put("success", true);
+        response.put("message", "해당 ID PlanChild 문서 찾는데 성공했습니다.");
+        response.put("entity", planChild);
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     /**
