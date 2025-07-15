@@ -1,16 +1,14 @@
 package com.example.iplan;
 
-import com.example.iplan.auth.jwt.JwtProperties;
-import com.example.iplan.config.GoogleConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 @EnableWebMvc
 @SpringBootApplication(exclude = {SecurityAutoConfiguration.class})
-@EnableConfigurationProperties({JwtProperties.class, GoogleConfig.class})
+@ConfigurationPropertiesScan
 public class IPlanApplication {
 
 	public static void main(String[] args) {
