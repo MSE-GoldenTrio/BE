@@ -1,6 +1,7 @@
 package com.example.iplan.auth;
 
 import com.example.iplan.auth.DTO.TokenRefreshRequestDTO;
+import com.example.iplan.fcm.FcmTokenService;
 import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
@@ -26,13 +27,6 @@ public class AuthController {
     private final JwtProperties jwtProperties;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
-
-    @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
-        String accessToken = authHeader.replace("Bearer ", "");
-        jwtTokenProvider.destroyToken(accessToken);
-        return ResponseEntity.ok().build();
-    }
 
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshAccessToken(@RequestBody TokenRefreshRequestDTO request) {
@@ -67,9 +61,9 @@ public class AuthController {
         Date expirationDate = jwtTokenProvider.getExpirationDate(refreshToken);
         long now = System.currentTimeMillis();
         long remainingMillis = expirationDate.getTime() - now;
-//        long oneWeekMillis = 7L * 24 * 60 * 60 * 1000; // 7일
-        // 테스트용: 1분으로 설정
-        long oneWeekMillis = 60 * 1000;
+        long oneWeekMillis = 7L * 24 * 60 * 60 * 1000; // 7일
+//         테스트용: 1분으로 설정
+//        long oneWeekMillis = 60 * 1000;
 
         // 5. accessToken 은 항상 새로 발급
         // 6. refreshToken 은 조건에 따라 새로 발급하거나 유지
