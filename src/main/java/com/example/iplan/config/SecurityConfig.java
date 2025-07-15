@@ -4,6 +4,7 @@ import com.example.iplan.auth.CustomLogoutHandler;
 import com.example.iplan.auth.ExceptionHandler.CustomAccessDeniedHandler;
 import com.example.iplan.auth.ExceptionHandler.CustomAuthenticationEntryPoint;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserService;
+import com.example.iplan.auth.oauth2.OAuth2FailureHandler;
 import com.example.iplan.auth.oauth2.OAuth2SuccessHandler;
 import com.example.iplan.auth.jwt.JwtAuthenticationFilter;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
@@ -35,6 +36,7 @@ public class SecurityConfig{
     private final FirebaseAuth firebaseAuth;
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final OAuth2FailureHandler oAuth2FailureHandler;
     private final CustomLogoutHandler customLogoutHandler;
     private final CustomAccessDeniedHandler customAccessDeniedHandler;
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
@@ -87,10 +89,11 @@ public class SecurityConfig{
                         )
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler) // 로그인 성공 핸들러
+                        .failureHandler(oAuth2FailureHandler) // 실패 핸들러
                 )
                 // 로그아웃 설정
                 .logout(logout -> logout
-                        .logoutUrl("/api/auth/logout") // 클라이언트에서 호출할 로그아웃 엔드포인트
+                        .logoutUrl("/api/logout") // 클라이언트에서 호출할 로그아웃 엔드포인트
                         .addLogoutHandler(customLogoutHandler)
                         .logoutSuccessHandler(customLogoutHandler)
                 )
