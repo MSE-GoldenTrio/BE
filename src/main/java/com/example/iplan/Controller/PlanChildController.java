@@ -95,7 +95,6 @@ public class PlanChildController {
     @Operation(summary = "단일 계획 업데이트 UPDATE", description = "특정 계획 데이터 값을 바꾼다.(계획 달성 체크의 경우도 해당), Id 필수")
     @PatchMapping("/update-plan")
     public ResponseEntity<Map<String, Object>> updatePlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
-        log.info("Child's plan 'is_completed' update");
         String childNickname = user.getUsername();
         return planChildService.updateOriginalPlan(request, childNickname);
     }
