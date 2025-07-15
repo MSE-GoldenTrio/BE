@@ -121,7 +121,6 @@ public class UserController {
         userInfo.put("name", user.getName());
         userInfo.put("authority", user.getAuthority().name());
         userInfo.put("linked_id", user.getLinked_id() != null ? user.getLinked_id() : ""); // null 방지
-        userInfo.put("fcmToken", user.getFcmToken() != null ? user.getFcmToken() : ""); // null 방지
 
         log.info("Received user info: {}", userInfo);
         return ResponseEntity.ok(userInfo);
