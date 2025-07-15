@@ -274,4 +274,20 @@ public class UserController {
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
     }
 
+    @DeleteMapping("/my_page/delete/linked_id")
+    public ResponseEntity<?> deleteLinkedID(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails, @RequestParam("linked_id") String linked_id){
+        log.info("연결된 계정: " + linked_id);
+
+        String email = userDetails.getEmail();
+        if(email != null){
+            userService.deleteLinkedId(email, linked_id);
+            return ResponseEntity.ok(Map.of(
+                    "message", "연결된 계정 삭제에 성공하였습니다."
+            ));
+        }else{
+            throw new CustomException("사용자의 이메일을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        }
+
+    }
+
 }

@@ -140,6 +140,7 @@ public class AccountParentService {
                 );
                 JwtToken newToken = jwtTokenProvider.generateToken(authentication);
                 log.info("요청 승인됨.. 토큰 재발급 완료");
+                accountRepository.delete(accountRequest);
                 return ResponseEntity.ok(Map.of(
                         "success", true,
                         "status", "approved",
@@ -150,6 +151,8 @@ public class AccountParentService {
             // 2. 요청이 거부된 경우
             else if (accountRequest != null && !accountRequest.isApproved() && Objects.equals(accountRequest.getStatus(), "denied")) {
                 log.info("요청 거부됨");
+
+                accountRepository.delete(accountRequest);
                 return ResponseEntity.ok(Map.of(
                         "success", true,
                         "status", "denied",

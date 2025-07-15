@@ -1,7 +1,6 @@
 package com.example.iplan.auth;
 
 import com.example.iplan.auth.DTO.TokenRefreshRequestDTO;
-import com.example.iplan.fcm.FcmTokenService;
 import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
@@ -16,7 +15,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequiredArgsConstructor
@@ -27,6 +28,14 @@ public class AuthController {
     private final JwtProperties jwtProperties;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
+    private final UserService userService;
+
+    @DeleteMapping("/delete-account")
+    public ResponseEntity<?> deleteAccount(@RequestHeader("Authorization") String authHeader) throws ExecutionException, InterruptedException {
+        String accessToken = authHeader.replace("Bearer ", "");
+        userService.withdraw(accessToken); // 탈퇴 처리 서비스 호출
+        return ResponseEntity.ok(Map.of("message", "회원 탈퇴가 완료되었습니다."));
+    }
 
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshAccessToken(@RequestBody TokenRefreshRequestDTO request) {

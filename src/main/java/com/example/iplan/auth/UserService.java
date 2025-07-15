@@ -2,6 +2,9 @@ package com.example.iplan.auth;
 
 import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.ExceptionHandler.CustomException;
+import com.example.iplan.Repository.FeedbackRepository;
+import com.example.iplan.Repository.PlanChildRepository;
+import com.example.iplan.Repository.RewardChildRepository;
 import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Service.AlarmService;
 import com.example.iplan.Service.PlanChildService;
@@ -12,12 +15,13 @@ import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.RefreshTokenService;
 import com.example.iplan.scheduler.PushSchedulerService;
+import com.google.api.client.util.Value;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.core.Authentication;
@@ -25,6 +29,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
@@ -37,12 +42,18 @@ import java.util.concurrent.ExecutionException;
 @Slf4j
 public class UserService {
     private final Firestore firestore;
+
     private final UserRepository userRepository;
+    private final PlanChildRepository planChildRepository;
+    private final RewardChildRepository rewardChildRepository;
+    private final FeedbackRepository feedbackRepository;
+
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
-    private final RefreshTokenService refreshTokenService;
     private final JwtProperties jwtProperties;
+
+    private final RefreshTokenService refreshTokenService;
     private final FcmTokenService fcmTokenService;
     private final PlanChildService planChildService;
     private final AlarmService alarmService;
@@ -128,6 +139,126 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
     }
+
+    public void withdraw(String accessToken) throws ExecutionException, InterruptedException {
+        String nickname = jwtTokenProvider.getUserNickname(accessToken);
+        Users user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", HttpStatus.NOT_FOUND));
+
+        log.info("회원 탈퇴 사용자 id: {}", nickname);
+
+        // 1. 토큰 무효화
+        jwtTokenProvider.destroyToken(accessToken, "withdraw");
+
+        // 2. 연동 해제
+        for (String linkedId : user.getLinked_id()) {
+            deleteLinkedId(user.getEmail(), linkedId);
+        }
+
+        // 3. 소셜 연동 해제
+        if(user.getProvider() != null && user.getProviderAccessToken() != null){
+            try{
+                unlinkSocial(user.getProvider(), user.getProviderAccessToken());
+            }catch (Exception e){
+                log.warn("소셜 연동 해제 실패 : {}", e.getMessage());
+                throw new CustomException("소셜 연동 해제 실패", HttpStatus.BAD_REQUEST);
+            }
+            user.setProviderAccessToken(null); // 토큰 사용 후 파기
+        }
+
+        // 4. 관련 데이터 삭제 (계획, 보상 등)
+        planChildRepository.deleteAllByUserId(nickname);
+        rewardChildRepository.deleteAllByUserId(nickname);
+        feedbackRepository.deleteAllByUserId(nickname);
+        // 5. 사용자 문서 삭제
+        userRepository.delete(user);
+
+        log.info("회원 탈퇴 완료: {}", nickname);
+    }
+
+    public void unlinkSocial(String provider, String providerAccessToken){
+        if(providerAccessToken == null || providerAccessToken.isBlank()){
+            log.warn("소셜 연동 해제 생략: 토큰 없음");
+            return;
+        }
+
+        try{
+            switch (provider.toUpperCase()){
+                case "KAKAO":
+                    unlinkKakao(providerAccessToken);
+                    break;
+                case "NAVER":
+                    unlinkNaver(providerAccessToken);
+                    break;
+                case "GOOGLE":
+                    unlinkGoogle(providerAccessToken);
+                    break;
+                default:
+                    log.warn("지원하지 않는 소셜 provider입니다: {}", provider);
+            }
+        }catch(Exception e){
+            log.warn("{} 소셜 연동 해제 중 오류 발생: {}", provider, e.getMessage());
+            throw new CustomException("소셜 연동 해제 중 오류 발생", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void unlinkKakao(String accessToken){
+        String url = "https://kapi.kakao.com/v1/user/unlink";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = new RestTemplate().postForEntity(url, entity, String.class);
+
+        if(response.getStatusCode().is2xxSuccessful()){
+            log.info("카카오 연동 해제 성공");
+        }else{
+            log.warn("카카오 연도오 해제 실패 또는 이미 해제됨: {}", response.getBody());
+        }
+    }
+    private void unlinkGoogle(String accessToken) {
+        String url = "https://oauth2.googleapis.com/revoke?token=" + accessToken;
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = new RestTemplate().postForEntity(url, entity, String.class);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            log.info("구글 연동 해제 성공");
+        } else {
+            log.warn("구글 연동 해제 실패 또는 이미 해제됨: {}", response.getBody());
+        }
+    }
+
+    @Value("${spring.security.oauth2.client.registration.naver.client-id}")
+    private String naverClientId;
+
+    @Value("${spring.security.oauth2.client.registration.naver.client-secret}")
+    private String naverClientSecret;
+
+    private void unlinkNaver(String accessToken) {
+        String url = "https://nid.naver.com/oauth2.0/token" +
+                "?grant_type=delete" +
+                "&client_id=" + naverClientId +
+                "&client_secret=" + naverClientSecret +
+                "&access_token=" + accessToken +
+                "&service_provider=NAVER";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = new RestTemplate().postForEntity(url, entity, String.class);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            log.info("네이버 연동 해제 성공");
+        } else {
+            log.warn("네이버 연동 해제 실패 또는 이미 해제됨: {}", response.getBody());
+        }
+    }
+
 
     /**
      * 닉네임을 기반으로 사용자 조회
@@ -227,6 +358,35 @@ public class UserService {
             }
         }
 
+    }
+
+    /**
+     * 계정 연동 해제
+     */
+    public void deleteLinkedId(String email, String linked_id){
+        try{
+            // 사용자의 연동된 계정을 삭제하고
+            Users user = findByEmail(email);
+
+            List<String> user_linked_id = user.getLinked_id();
+            user_linked_id.remove(linked_id);
+            user.setLinked_id(user_linked_id);
+
+            userRepository.update(user);
+
+            // 상대 연동 계정에서 나도 삭제한다.
+            Users linked_user = userRepository.findByNickname(linked_id)
+                    .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다: " + linked_id, HttpStatus.NOT_FOUND));
+
+            List<String> linked_user_linked_id = linked_user.getLinked_id();
+            linked_user_linked_id.remove(user.getNickname());
+            linked_user.setLinked_id(linked_user_linked_id);
+
+            userRepository.update(linked_user);
+
+        }catch (Exception e){
+            throw new CustomException("연동 아이디 제거 중 오류 발생: "+ e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
     }
 }
 
