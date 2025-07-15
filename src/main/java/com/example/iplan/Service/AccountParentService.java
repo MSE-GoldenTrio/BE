@@ -130,10 +130,9 @@ public class AccountParentService {
         try {
             // 1. 요청이 승인된 경우
             PendingAccountRequest accountRequest = accountRepository.findByChildNicknameAndParentNickname(childNickname, parentNickname);
-            log.info("승인된 요청: {}", accountRequest);
             if (accountRequest != null && accountRequest.isApproved() && Objects.equals(accountRequest.getStatus(), "approved")) {
                 // 사용자 정보 조회
-                Users parentUser = userRepository.findByFields(Map.of("nickname", parentNickname));
+                Users parentUser = userRepository.findByField("nickname", parentNickname);
                 // 연동 완료된 parentUser로 토큰 재발급
                 CustomOAuth2UserDetails userDetails = new CustomOAuth2UserDetails(parentUser);
                 Authentication authentication = new UsernamePasswordAuthenticationToken(
@@ -163,7 +162,7 @@ public class AccountParentService {
                 return ResponseEntity.ok(Map.of(
                         "success", true,
                         "status", "pending",
-                        "message", String.format("%s 계정에 대한 연동 요청이 승인될 때까지 기다려주세요", childNickname)
+                        "message", String.format("%s 계정에 대한 연동 요청이 승인될 때까지 기다려주세요.", childNickname)
                 ));
             }
             return null;
