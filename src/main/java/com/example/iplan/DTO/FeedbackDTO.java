@@ -15,7 +15,7 @@ public class FeedbackDTO {
 
     private String comment; // 부모님의 코멘트
 
-    private int grade; // 별점 (1~3 사이의 점수)
+    private int grade; // 별점 (1~5 사이의 점수)
 
     private boolean success; // 보상을 지급하였는지 보류하였는지 (계획을 모두 달성했는가)
 }
