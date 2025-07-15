@@ -1,11 +1,17 @@
 package com.example.iplan.auth;
 
+import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.ExceptionHandler.CustomException;
+import com.example.iplan.Repository.PlanChildRepository;
+import com.example.iplan.Service.AlarmService;
+import com.example.iplan.Service.PlanChildService;
+import com.example.iplan.fcm.FcmTokenService;
 import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.RefreshTokenService;
+import com.example.iplan.scheduler.PushSchedulerService;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
@@ -37,6 +43,10 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final JwtProperties jwtProperties;
+    private final FcmTokenService fcmTokenService;
+    private final PlanChildService planChildService;
+    private final AlarmService alarmService;
+    private final PushSchedulerService pushSchedulerService;
 
     // 회원가입
     public String signUp(String nickname, String password, String name, String email, String roleStr) {
@@ -93,14 +103,16 @@ public class UserService {
                     .orElseThrow(() -> new IllegalArgumentException("User not found."));
 
             // 4. fcmToken 디비에 업데이트
-            user.setFcmToken(fcmToken);
-            log.info("Updated fcmToken for user: {}", nickname);
+            fcmTokenService.save(nickname, fcmToken);
 
-            // 5. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
+            // 5. 새 디바이스에 푸시 예약 복구
+            saveFutureAlarm(nickname, fcmToken);
+
+            // 6. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
             JwtToken jwtToken = jwtTokenProvider.generateToken(authentication);
             log.info("JwtToken created: accessToken = {}, refreshToken = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
 
-            // 6. Refresh 토큰 Redis 에 저장
+            // 7. Refresh 토큰 Redis 에 저장
             long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
 
             refreshTokenService.saveToken(
@@ -110,7 +122,7 @@ public class UserService {
             );
             log.info("Saved refresh token in Redis: nickname={}, ttl={}min", nickname, expirationMinutes);
 
-            // 7. jwt 반환
+            // 8. jwt 반환
             return jwtToken;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
@@ -192,6 +204,26 @@ public class UserService {
             } catch (InterruptedException | ExecutionException e) {
                 System.out.println("업데이트 실패: " + e.getMessage());
                 throw new CustomException("비밀번호 변경 실패", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        }
+
+    }
+
+    /**
+     * 다른 FCM 디바이스에서 새로 로그인할 때,
+     * 해당 유저가 알림을 설정한 향후 모든 계획을 새 fcmToken 기준으로 예약
+     */
+    public void saveFutureAlarm(String userId, String fcmToken) throws ExecutionException, InterruptedException {
+        List<PlanChild> futurePlans = planChildService.findFuturePlansWithAlarm(userId);
+        log.info("미래 알람 계획 수: {}", futurePlans.size());
+
+        for (PlanChild plan : futurePlans) {
+            try {
+                pushSchedulerService.schedulePushNotification(plan, fcmToken);
+                alarmService.saveAlarm(plan.getId(), fcmToken);
+                log.info("향후 푸시 예약 및 Alarm 저장 완료: plan={}, token={}", plan.getId(), fcmToken);
+            } catch (Exception e) {
+                log.error("푸시 예약/저장 실패: plan={}, error={}", plan.getId(), e.getMessage(), e);
             }
         }
 
