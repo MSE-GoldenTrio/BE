@@ -71,12 +71,18 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
      */
     private void saveOrUpdate(OAuth2UserInfo oAuth2UserInfo) {
         try {
+            // 이메일로 사용자 조회
             Optional<Users> existingUser = userRepository.findByEmail(oAuth2UserInfo.getEmail());
             if (existingUser.isPresent()) {
                 // 1. 기존 회원이 로그인하는 경우
                 user = existingUser.get();
+
+                // 일반 로그인 사용자라면 소셜 로그인 거부 -> 비밀번호가 null 이 아님
+                if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+                    throw new IllegalArgumentException("이미 일반 회원가입된 이메일입니다. 이메일/비밀번호로 로그인하세요.");
+                }
                 isNewUser = false; // 기존 회원
-                log.info("User already exists: {}", user.getEmail());
+                log.info("소셜 로그인: 기존 유저 {}", user.getEmail());
             } else {
                 // 2. 신규 회원이 로그인하는 경우 -> 랜덤 닉네임 생성 후 저장
                 if (oAuth2UserInfo.getEmail() == null || oAuth2UserInfo.getEmail().isEmpty()) {
@@ -87,17 +93,18 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         .email(oAuth2UserInfo.getEmail())
                         .name(oAuth2UserInfo.getName())
                         .nickname(randomNickname) // 랜덤 닉네임 할당
-                        .password("")
+                        .password("")   // 소셜 로그인은 비밀번호 없음
                         .authority(UserRole.UNKNOWN) // UserRole 타입으로 직접 전달, 아직 권한 미지정
                         .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
                         .build();
                 userRepository.saveWithAutoIncrement(user);
 
                 isNewUser = true; // 신규 회원
-                log.info("New user registered: {}, Random nickname: {}", user.getEmail(), randomNickname);
+                log.info("신규 소셜 사용자 등록: {}", user.getEmail());
             }
         } catch (ExecutionException | InterruptedException e) {
             log.error("Firestore error: ", e);
+            throw new RuntimeException("서버 오류로 인해 로그인에 실패했습니다.");
         }
     }
 
