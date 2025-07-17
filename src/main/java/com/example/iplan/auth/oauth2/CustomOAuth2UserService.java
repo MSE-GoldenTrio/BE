@@ -12,6 +12,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
@@ -83,7 +85,9 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
                 // 일반 로그인 사용자라면 소셜 로그인 거부 -> 비밀번호가 null 이 아님
                 if (user.getPassword() != null && !user.getPassword().isEmpty()) {
-                    throw new IllegalArgumentException("이미 일반 회원가입된 이메일입니다. 이메일/비밀번호로 로그인하세요.");
+                    throw new OAuth2AuthenticationException(
+                            new OAuth2Error("email_exists", "이미 일반 회원가입된 이메일입니다. 아이디/비밀번호로 로그인하세요.", null)
+                    );
                 }
                 isNewUser = false; // 기존 회원
                 log.info("소셜 로그인: 기존 유저 {}", user.getEmail());
