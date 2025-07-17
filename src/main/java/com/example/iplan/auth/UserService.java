@@ -140,12 +140,17 @@ public class UserService {
         }
     }
 
-    public void withdraw(String accessToken) throws ExecutionException, InterruptedException {
+    public void withdraw(String accessToken, String fcmToken, String userId) throws ExecutionException, InterruptedException {
         String nickname = jwtTokenProvider.getUserNickname(accessToken);
         Users user = userRepository.findByNickname(nickname)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", HttpStatus.NOT_FOUND));
 
         log.info("회원 탈퇴 사용자 id: {}", nickname);
+
+        // 1. FCM 토큰 삭제
+        if (fcmToken != null && !fcmToken.isBlank()) {
+            fcmTokenService.deleteToken(userId, fcmToken);
+        }
 
         // 1. 토큰 무효화
         jwtTokenProvider.destroyToken(accessToken, "withdraw");
@@ -274,10 +279,18 @@ public class UserService {
     }
 
     /**
-     * 아이디(닉네임 중복 체크
+     * 아이디(닉네임) 중복 체크
      */
     public boolean isNicknameAvailable(String nickname) {
         Optional<Users> user = userRepository.findByNickname(nickname);
+        return user.isEmpty(); // 사용 가능하면 true, 중복이면 false
+    }
+
+    /**
+     * 이메일 중복 체크
+     */
+    public boolean isEmailAvailable(String email) {
+        Optional<Users> user = userRepository.findByEmail(email);
         return user.isEmpty(); // 사용 가능하면 true, 중복이면 false
     }
 
@@ -351,7 +364,7 @@ public class UserService {
         for (PlanChild plan : futurePlans) {
             try {
                 pushSchedulerService.schedulePushNotification(plan, fcmToken);
-                alarmService.saveAlarm(plan.getId(), fcmToken);
+//                alarmService.saveAlarm(plan.getId(), fcmToken);
                 log.info("향후 푸시 예약 및 Alarm 저장 완료: plan={}, token={}", plan.getId(), fcmToken);
             } catch (Exception e) {
                 log.error("푸시 예약/저장 실패: plan={}, error={}", plan.getId(), e.getMessage(), e);

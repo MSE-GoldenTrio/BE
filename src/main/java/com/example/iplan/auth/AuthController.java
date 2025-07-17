@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
@@ -22,7 +23,7 @@ import java.util.concurrent.ExecutionException;
 @RestController
 @RequiredArgsConstructor
 @Slf4j
-@RequestMapping("/api/auth")
+@RequestMapping("/api")
 public class AuthController {
 
     private final JwtProperties jwtProperties;
@@ -31,13 +32,16 @@ public class AuthController {
     private final UserService userService;
 
     @DeleteMapping("/delete-account")
-    public ResponseEntity<?> deleteAccount(@RequestHeader("Authorization") String authHeader) throws ExecutionException, InterruptedException {
+    public ResponseEntity<?> deleteAccount(@RequestHeader("Authorization") String authHeader,
+                                           @RequestHeader("fcm-token") String fcmToken,
+                                           @AuthenticationPrincipal CustomOAuth2UserDetails customOAuth2UserDetails) throws ExecutionException, InterruptedException {
         String accessToken = authHeader.replace("Bearer ", "");
-        userService.withdraw(accessToken); // 탈퇴 처리 서비스 호출
+        String userId = customOAuth2UserDetails.getUsername();
+        userService.withdraw(accessToken, fcmToken, userId); // 탈퇴 처리 서비스 호출
         return ResponseEntity.ok(Map.of("message", "회원 탈퇴가 완료되었습니다."));
     }
 
-    @PostMapping("/refresh")
+    @PostMapping("/auth/refresh")
     public ResponseEntity<?> refreshAccessToken(@RequestBody TokenRefreshRequestDTO request) {
         String accessToken = request.getAccessToken();
         String refreshToken = request.getRefreshToken();
