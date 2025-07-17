@@ -74,11 +74,8 @@ public class PlanChildService {
 
                 if (!fcmTokens.isEmpty()) {
                     for (FcmToken token : fcmTokens) {
-                        // 1. 푸시 알림 예약
+                        // 1. 푸시 알림 예약 + Alarm 에 저장 (서버 재시작 시 다시 불러와야하므로)
                         pushSchedulerService.schedulePushNotification(planPost, token.getToken());
-
-                        // 2. Alarm 에 저장 (서버 재시작 시 다시 불러와야하므로)
-                        alarmService.saveAlarm(planPost.getId(), token.getToken());
                         log.info("푸시 알림 예약 및 Alarm 저장 완료!!");
                     }
                 } else {
@@ -108,9 +105,11 @@ public class PlanChildService {
         PlanChild existingPlan = planChildRepository.findEntityByDocumentId(planChildDTO.getId());
 
         if(existingPlan == null){
+            log.info("계획이 존재하지 않아 수정 불가");
             throw new CustomException("해당 Id의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
         }
         if(!Objects.equals(existingPlan.getUser_id(), user_id)) {
+            log.info("계획 수정 권한이 없음");
             throw new CustomException("해당 계획에 대한 수정 권한이 없습니다.", HttpStatus.UNAUTHORIZED);
         }
 
@@ -131,7 +130,7 @@ public class PlanChildService {
                 .build();
         try{
             planChildRepository.update(updatePlan);
-            log.info("Updated plan successfully!");
+            log.info("계획 업데이트 성공!!");
         }
         catch (Exception e){
             throw new CustomException("계획 업데이트에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);
@@ -155,7 +154,7 @@ public class PlanChildService {
                 for (FcmToken token : fcmTokens) {
                     // 기존 예약이 있다면 내부적으로 덮어쓰기 처리됨
                     pushSchedulerService.schedulePushNotification(updatePlan, token.getToken());
-                    alarmService.saveAlarm(updatePlan.getId(), token.getToken());
+//                    alarmService.saveAlarm(updatePlan.getId(), token.getToken());
                     log.info("푸시 알림 예약 및 Alarm 저장 완료: planId = {}, token = {}", updatePlan.getId(), token.getToken());
                 }
             } else {

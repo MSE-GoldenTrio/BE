@@ -73,6 +73,14 @@ public class PushSchedulerService {
                 .put(fcmToken, future);
 
         log.info("푸시 예약 완료: {} / 시간: {} / 토큰: {}", plan.getTitle(), targetTime, fcmToken);
+
+        // 푸시 예약 성공 후에만 알람 저장
+        try {
+            alarmService.saveAlarm(plan.getId(), fcmToken);
+            log.info("알람 저장 성공!");
+        } catch (Exception e) {
+            log.error("알람 저장 실패: planId = {}, token = {}, error = {}", plan.getId(), fcmToken, e.getMessage());
+        }
     }
 
     /**
