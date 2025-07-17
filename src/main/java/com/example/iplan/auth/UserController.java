@@ -93,6 +93,14 @@ public class UserController {
         return ResponseEntity.ok(Map.of("available", isAvailable));
     }
 
+    @PostMapping("/auth/check-email")
+    @Operation(summary = "중복 이메일 체크")
+    public ResponseEntity<Map<String, Boolean>> checkEmail(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        log.info("Request email = {}", email);
+        boolean isAvailable = userService.isEmailAvailable(email);
+        return ResponseEntity.ok(Map.of("available", isAvailable));
+    }
 
     /**
      * 닉네임으로 사용자 정보 조회 -> 전체 정보 반환!!
