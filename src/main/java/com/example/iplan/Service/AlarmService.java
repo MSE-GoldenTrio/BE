@@ -25,6 +25,10 @@ public class AlarmService {
      */
     public void saveAlarm(String planId, String fcmToken) throws ExecutionException, InterruptedException {
         try {
+            if(alarmRepository.getAlarmByPlanIdAndToken(planId, fcmToken) != null) {
+                log.info("해당 계획에 대한 알람이 이미 존재합니다.");
+                return;
+            }
             Alarm alarm = Alarm.builder()
                     .plan_id(planId)
                     .fcmToken(fcmToken)
