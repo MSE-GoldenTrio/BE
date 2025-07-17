@@ -24,6 +24,8 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         log.warn("401 에러: 인증 없이 접근 - {}", authException.getMessage());
 
         String errorMessage = "인증이 필요합니다.";
+
+        // CustomAuthenticationException (인증 실패)를 throw 한 경우
         if (authException instanceof CustomAuthenticationException) {
             errorMessage = authException.getMessage();
         }
