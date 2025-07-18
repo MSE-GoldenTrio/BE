@@ -1,15 +1,21 @@
 package com.example.iplan.auth;
 
+import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.FeedbackRepository;
 import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.RewardChildRepository;
+import com.example.iplan.Repository.PlanChildRepository;
+import com.example.iplan.Service.AlarmService;
+import com.example.iplan.Service.PlanChildService;
+import com.example.iplan.fcm.FcmTokenService;
 import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.RefreshTokenService;
 import com.example.iplan.util.AES256Encryptor;
+import com.example.iplan.scheduler.PushSchedulerService;
 import com.google.api.client.util.Value;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
@@ -47,8 +53,13 @@ public class UserService {
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
-    private final RefreshTokenService refreshTokenService;
     private final JwtProperties jwtProperties;
+
+    private final RefreshTokenService refreshTokenService;
+    private final FcmTokenService fcmTokenService;
+    private final PlanChildService planChildService;
+    private final AlarmService alarmService;
+    private final PushSchedulerService pushSchedulerService;
 
     private final AES256Encryptor aes;
 
@@ -112,14 +123,16 @@ public class UserService {
                     .orElseThrow(() -> new IllegalArgumentException("User not found."));
 
             // 4. fcmToken 디비에 업데이트
-            user.setFcmToken(fcmToken);
-            log.info("Updated fcmToken for user: {}", nickname);
+            fcmTokenService.save(nickname, fcmToken);
 
-            // 5. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
+            // 5. 새 디바이스에 푸시 예약 복구
+            saveFutureAlarm(nickname, fcmToken);
+
+            // 6. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
             JwtToken jwtToken = jwtTokenProvider.generateToken(authentication);
             log.info("JwtToken created: accessToken = {}, refreshToken = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
 
-            // 6. Refresh 토큰 Redis 에 저장
+            // 7. Refresh 토큰 Redis 에 저장
             long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
 
             refreshTokenService.saveToken(
@@ -129,22 +142,27 @@ public class UserService {
             );
             log.info("Saved refresh token in Redis: nickname={}, ttl={}min", nickname, expirationMinutes);
 
-            // 7. jwt 반환
+            // 8. jwt 반환
             return jwtToken;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
     }
 
-    public void withdraw(String accessToken) throws ExecutionException, InterruptedException {
+    public void withdraw(String accessToken, String fcmToken, String userId) throws ExecutionException, InterruptedException {
         String nickname = jwtTokenProvider.getUserNickname(accessToken);
         Users user = userRepository.findByNickname(nickname)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", HttpStatus.NOT_FOUND));
 
         log.info("회원 탈퇴 사용자 id: {}", nickname);
 
+        // 1. FCM 토큰 삭제
+        if (fcmToken != null && !fcmToken.isBlank()) {
+            fcmTokenService.deleteToken(userId, fcmToken);
+        }
+
         // 1. 토큰 무효화
-        jwtTokenProvider.destroyToken(accessToken);
+        jwtTokenProvider.destroyToken(accessToken, "withdraw");
 
         // 2. 연동 해제
         for (String linkedId : user.getLinked_id()) {
@@ -275,10 +293,18 @@ public class UserService {
     }
 
     /**
-     * 아이디(닉네임 중복 체크
+     * 아이디(닉네임) 중복 체크
      */
     public boolean isNicknameAvailable(String nickname) {
         Optional<Users> user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname));
+        return user.isEmpty(); // 사용 가능하면 true, 중복이면 false
+    }
+
+    /**
+     * 이메일 중복 체크
+     */
+    public boolean isEmailAvailable(String email) {
+        Optional<Users> user = userRepository.findByHashValueEmail(email);
         return user.isEmpty(); // 사용 가능하면 true, 중복이면 false
     }
 
@@ -341,6 +367,29 @@ public class UserService {
 
     }
 
+    /**
+     * 다른 FCM 디바이스에서 새로 로그인할 때,
+     * 해당 유저가 알림을 설정한 향후 모든 계획을 새 fcmToken 기준으로 예약
+     */
+    public void saveFutureAlarm(String userId, String fcmToken) throws ExecutionException, InterruptedException {
+        List<PlanChild> futurePlans = planChildService.findFuturePlansWithAlarm(userId);
+        log.info("미래 알람 계획 수: {}", futurePlans.size());
+
+        for (PlanChild plan : futurePlans) {
+            try {
+                pushSchedulerService.schedulePushNotification(plan, fcmToken);
+//                alarmService.saveAlarm(plan.getId(), fcmToken);
+                log.info("향후 푸시 예약 및 Alarm 저장 완료: plan={}, token={}", plan.getId(), fcmToken);
+            } catch (Exception e) {
+                log.error("푸시 예약/저장 실패: plan={}, error={}", plan.getId(), e.getMessage(), e);
+            }
+        }
+
+    }
+
+    /**
+     * 계정 연동 해제
+     */
     public void deleteLinkedId(String email, String linked_id){
         try{
             // 사용자의 연동된 계정을 삭제하고

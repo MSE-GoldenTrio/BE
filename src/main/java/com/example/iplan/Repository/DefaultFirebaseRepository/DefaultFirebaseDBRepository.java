@@ -34,7 +34,9 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         this.collectionName = collectionName;
     }
 
-    // Entity 저장 메서드
+    /**
+     * 저장 메서드
+     */
     @Override
     public void save(T entity) throws ExecutionException, InterruptedException {
         // 1. Firestore 컬렉션 참조 가져오기
@@ -51,7 +53,9 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         setDocumentIdField(entity, documentId);
     }
 
-    // 원하는 ID로 문서 저장하는 메서드 추가
+    /**
+     * 원하는 ID로 문서 ID 지정 후 저장
+     */
     public void saveWithId(T entity, String documentId) throws ExecutionException, InterruptedException {
         CollectionReference collection = firestore.collection(collectionName);
 
@@ -69,7 +73,7 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
     public int getNextAutoIncrementId(String collectionName) throws ExecutionException, InterruptedException {
         DocumentReference counterRef = firestore.collection("Counters").document(collectionName);
 
-        // 🔹 트랜잭션을 사용하여 문서가 없으면 자동 생성
+        // 트랜잭션을 사용하여 문서가 없으면 자동 생성
         return firestore.runTransaction(transaction -> {
             DocumentSnapshot snapshot = transaction.get(counterRef).get();
             int newId = 1;
@@ -80,7 +84,7 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
                 initData.put("lastId", 1);
                 transaction.set(counterRef, initData);
             } else {
-                // 🔥 기존 lastId 값을 +1 증가
+                // 기존 lastId 값을 +1 증가
                 newId = snapshot.getLong("lastId").intValue() + 1;
                 transaction.update(counterRef, "lastId", newId);
             }
@@ -96,33 +100,18 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
     public void saveWithAutoIncrement(T entity) throws ExecutionException, InterruptedException {
         CollectionReference collection = firestore.collection(collectionName);
 
-        // 🔥 Auto Increment ID 가져오기
+        // Auto Increment ID 가져오기
         String documentId = String.valueOf(getNextAutoIncrementId(collectionName));
 
         // Firestore에 데이터 저장
         ApiFuture<WriteResult> result = collection.document(documentId).set(entity);
         result.get(); // 저장 완료 대기
 
-        // @DocumentId 필드에 Auto Increment된 ID 설정
-        setDocumentIdField(entity, documentId);
-    }
-
-    // Entity 저장 메서드 - 저장 후 엔티티 반환
-    public T saveAndReturn(T entity) throws ExecutionException, InterruptedException {
-        CollectionReference collection = firestore.collection(collectionName);
-
-        // 1. 고유 Document ID 생성
-        String documentId = UUID.randomUUID().toString();
-
-        // 2. Firestore에 데이터 저장
-        ApiFuture<WriteResult> result = collection.document(documentId).set(entity);
-        result.get(); // 저장이 완료될 때까지 대기
-
-        // 3. 엔티티의 @DocumentId 필드에 ID 설정
+        // @DocumentId 필드에 Auto Increment된 ID 설정 -> planPost.setId(documentId) 과 같음
         setDocumentIdField(entity, documentId);
 
-        // ✅ 저장된 엔티티를 반환하도록 수정
-        return entity;
+        // 반환값이 없어도 ok
+        // why? 자바에서는 객체를 참조로 전달하기 때문에 여기서 해당 객체의 필드 값을 변경하면 외부에서도 반영됨
     }
 
     // @DocumentId 필드에 ID를 설정하는 헬퍼 메서드
@@ -141,7 +130,9 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         }
     }
 
-    // Entity 업데이트 메서드
+    /**
+     * 업데이트 메서드
+     */
     @Override
     public void update(T entity) throws ExecutionException, InterruptedException {
         CollectionReference collection = firestore.collection(collectionName);
@@ -149,7 +140,9 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         result.get();
     }
 
-    // Entity 삭제 메서드
+    /**
+     * 삭제 메서드
+     */
     @Override
     public void delete(T entity) throws ExecutionException, InterruptedException {
         CollectionReference collection = firestore.collection(collectionName);
@@ -188,6 +181,21 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
     }
 
     /**
+     * 컬렉션의 모든 문서를 가져오는 메서드
+     */
+    public List<T> findAll() throws ExecutionException, InterruptedException {
+        CollectionReference collection = firestore.collection(collectionName);
+        ApiFuture<QuerySnapshot> future = collection.get();
+        QuerySnapshot querySnapshot = future.get();
+
+        if (!querySnapshot.isEmpty()) {
+            return querySnapshot.toObjects(entityClass);
+        }
+
+        return Collections.emptyList();
+    }
+
+    /**
      * 문서 아이디로 고유 문서를 찾는 메서드
      * 이는 user_id도 필요 없다.
      * @param document_id
@@ -208,7 +216,13 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         return null;
     }
 
-    // 특정 사용자 ID로 모든 Entity 검색 메서드
+    /**
+     * 특정 사용자 ID로 모든 Entity 검색 메서드
+     * @param user_id
+     * @return
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
     @Override
     public List<T> findEntityAll(String user_id) throws ExecutionException, InterruptedException{
         CollectionReference collection = firestore.collection(collectionName);
@@ -243,6 +257,27 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
 
         return null;
     }
+
+    /**
+     * 하나의 필드 조건으로 해당하는 모든 문서를 찾는 메서드
+     * 예: 특정 user_id 또는 plan_id에 해당하는 모든 문서 검색
+     *
+     * @param fieldName 필드 이름 (예: "user_id")
+     * @param value     필드 값 (예: "abc123")
+     * @return 조건에 해당하는 문서 목록, 없으면 빈 리스트
+     */
+    public List<T> findAllByField(String fieldName, Object value) throws ExecutionException, InterruptedException {
+        CollectionReference collection = firestore.collection(collectionName);
+        ApiFuture<QuerySnapshot> future = collection.whereEqualTo(fieldName, value).get();
+        QuerySnapshot snapshot = future.get();
+
+        if (!snapshot.isEmpty()) {
+            return snapshot.toObjects(entityClass);
+        }
+
+        return Collections.emptyList();
+    }
+
 
 
     /**

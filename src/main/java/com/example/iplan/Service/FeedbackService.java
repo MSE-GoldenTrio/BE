@@ -16,10 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Slf4j
@@ -114,48 +111,54 @@ public class FeedbackService {
     }
 
     /**
-     * 부모님의 보상 코멘트와 별점 수정 기능
-     * @param rewardParentsDTO 수정할 RewardParents 객체
+     * 기존 피드백을 수정하는 기능 (댓글, 별점, 성공 여부 포함)
+     * @param feedbackDTO 수정할 RewardParents 객체
      * @return 수정 결과
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> updateRewardParents(FeedbackDTO rewardParentsDTO) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updateFeedback(FeedbackDTO feedbackDTO, String parentNickname) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
 
         try {
             // 1. reward_id로 Feedback 에서 해당 객체 찾기
-            Feedback existingFeedback = feedbackRepository.findByField("reward_id", rewardParentsDTO.getReward_id());
+            Feedback existingFeedback = feedbackRepository.findByField("reward_id", feedbackDTO.getReward_id());
 
             if (existingFeedback == null) {
                 throw new CustomException("해당 ID의 지급된 피드백을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
             }
+            if (!Objects.equals(existingFeedback.getUser_id(), parentNickname)) {
+                throw new CustomException("해당 피드백에 대한 수정 권한이 없습니다.", HttpStatus.UNAUTHORIZED);
+            }
 
             // 빌더 패턴을 사용하여 Feedback 객체를 새롭게 업데이트
-            Feedback updatedRewardParents = Feedback.builder()
+            Feedback updateFeedback = Feedback.builder()
                     .id(existingFeedback.getId()) // 기존 ID 유지
                     .user_id(existingFeedback.getUser_id())
+                    .child_id(existingFeedback.getChild_id())
                     .reward_id(existingFeedback.getReward_id())
-                    .comment(rewardParentsDTO.getComment() != null ? aes.encrypt(rewardParentsDTO.getComment()) : existingFeedback.getComment())
-                    .grade(rewardParentsDTO.getGrade() != 0 ? rewardParentsDTO.getGrade() : existingFeedback.getGrade())
+                    .comment(feedbackDTO.getComment() != null ? aes.encrypt(feedbackDTO.getComment()) : existingFeedback.getComment())
+                    .grade(feedbackDTO.getGrade() != 0 ? feedbackDTO.getGrade() : existingFeedback.getGrade())
                     .rewarded(true) // 항상 보상 지급 상태를 true로 설정
-                    .success(rewardParentsDTO.isSuccess())  // 보상을 회수하는 경우도 가능
+                    .success(feedbackDTO.isSuccess())  // 보상을 회수하는 경우도 가능
                     .build();
 
 
-            feedbackRepository.update(updatedRewardParents);
+            feedbackRepository.update(updateFeedback);
 
-            String rewardId = existingFeedback.getReward_id();
-            RewardChild reward = rewardChildRepository.findEntityByDocumentId(rewardId);
+            // 보상 객체도 함께 수정
+            RewardChild reward = rewardChildRepository.findEntityByDocumentId(existingFeedback.getReward_id());
             if (reward == null) {
                 throw new CustomException("해당 ID의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
             }
             reward.setRewarded(true);
-            reward.setSuccess(rewardParentsDTO.isSuccess());
+            reward.setSuccess(feedbackDTO.isSuccess());
             rewardChildRepository.update(reward);
 
             response.put("success", true);
             response.put("message", "부모님의 코멘트와 별점이 정상적으로 수정되었습니다.");
+            response.put("id", updateFeedback.getId());
+            log.info("피드백 수정 완료 id: {}", updateFeedback.getId());
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
             throw new CustomException("수정에 실패했습니다. Error: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);

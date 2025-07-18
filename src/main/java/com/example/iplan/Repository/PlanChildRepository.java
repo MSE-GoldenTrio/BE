@@ -1,14 +1,21 @@
 package com.example.iplan.Repository;
 
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.DefaultFirebaseRepository.DefaultFirebaseDBRepository;
 import com.example.iplan.Domain.PlanChild;
 import com.google.cloud.firestore.*;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+@Slf4j
 @Repository
 public class PlanChildRepository extends DefaultFirebaseDBRepository<PlanChild> {
 
@@ -23,10 +30,8 @@ public class PlanChildRepository extends DefaultFirebaseDBRepository<PlanChild> 
      * @param user_id 유저 아이디
      * @param targetDate 어떤 계획이 있는지 알고 싶은 날짜
      * @return 해당 날짜 계획들(PlanChild List)
-     * @throws ExecutionException
-     * @throws InterruptedException
      */
-    public List<PlanChild> findByDate(String user_id, String targetDate) throws ExecutionException, InterruptedException {
+    public List<PlanChild> findPlanByDate(String user_id, String targetDate) throws ExecutionException, InterruptedException {
         String[] dateArr = targetDate.split("-");
 
         Map<String, Object> filters = Map.of(
@@ -37,4 +42,27 @@ public class PlanChildRepository extends DefaultFirebaseDBRepository<PlanChild> 
         );
         return findAllByFields(filters);
     }
+
+    /**
+     * Plan ID로 해당하는 문서 반환
+     */
+    public PlanChild findPlanByID(String planId) throws ExecutionException, InterruptedException {
+        PlanChild planChild = findEntityByDocumentId(planId);
+        if (planChild == null) {
+            throw new CustomException("해당 ID의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
+        }
+        return planChild;
+    }
+
+    /**
+     * 유저 닉네임과 알람 여부로 해당하는 모든 계획 반환
+     */
+    public List<PlanChild> findPlansWithAlarmByUser(String userId) throws ExecutionException, InterruptedException {
+        Map<String, Object> filters = Map.of(
+                "user_id", userId,
+                "alarm", true
+        );
+        return findAllByFields(filters);
+    }
+
 }

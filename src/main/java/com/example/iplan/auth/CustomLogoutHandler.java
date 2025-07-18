@@ -1,6 +1,7 @@
 package com.example.iplan.auth;
 
 import com.example.iplan.ExceptionHandler.CustomException;
+import com.example.iplan.fcm.FcmTokenService;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,18 +22,27 @@ import java.io.IOException;
 public class CustomLogoutHandler implements LogoutHandler, LogoutSuccessHandler {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final FcmTokenService fcmTokenService;
 
     @Override
     public void logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
         log.info("로그아웃 요청 수신");
 
-        // Authorization 헤더에서 토큰 추출
-        String header = request.getHeader("Authorization");
+        // Authorization 헤더에서 추출
+        String header = request.getHeader("Authorization"); // accessToken
+        String fcmToken = request.getHeader("fcm-token");
+
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
+            String userId = jwtTokenProvider.getUserNickname(token);
+
+            // FCM 토큰 삭제
+            if (fcmToken != null && !fcmToken.isBlank()) {
+                fcmTokenService.deleteToken(userId, fcmToken);
+            }
 
             // 토큰 무효화 처리
-            jwtTokenProvider.destroyToken(token);
+            jwtTokenProvider.destroyToken(token, "logout");
             log.info("토큰 무효화 처리 완료 (Redis Blacklist 등록)");
         } else {
             throw new CustomException("Authorization 헤더가 없거나 형식이 잘못되었습니다.", HttpStatus.BAD_REQUEST);

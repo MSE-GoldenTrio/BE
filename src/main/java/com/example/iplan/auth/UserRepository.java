@@ -18,7 +18,7 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
 
     public Optional<Users> findByEmail(String email) {
         try {
-            Users user = findByFields(Map.of("email", email)); // 이메일을 기반으로 조회
+            Users user = findByField("email", email); // 이메일을 기반으로 조회
             return Optional.ofNullable(user);
         } catch (ExecutionException | InterruptedException e) {
             e.printStackTrace();
@@ -38,7 +38,7 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
 
     public Optional<Users> findByNickname(String nickname) {
         try {
-            Users user = findByFields(Map.of("nickname", nickname)); // 아이디(닉네임) 기반으로 조회
+            Users user = findByField("nickname", nickname); // 아이디(닉네임) 기반으로 조회
             return Optional.ofNullable(user);
         } catch (ExecutionException | InterruptedException e) {
             e.printStackTrace();
@@ -67,7 +67,7 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
 
     public boolean isLinkedToChild(String parentUid, String childUid) {
         try {
-            Users parent = findByFields(Map.of("nickname", parentUid));
+            Users parent = findByField("nickname", parentUid);
             if (parent != null && parent.getLinked_id() != null) {
                 return parent.getLinked_id().contains(childUid);
             }

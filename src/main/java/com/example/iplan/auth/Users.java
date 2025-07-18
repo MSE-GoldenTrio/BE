@@ -47,9 +47,6 @@ public class Users {
     @Schema(description = "사용자와 연동된 ID 목록", example = "[\"child1\", \"child2\"]")
     private List<String> linked_id = new ArrayList<>();
 
-    @Schema(description = "사용자 기기 토큰 값", example = "abc456")
-    private String fcmToken = null;
-
     @Schema(description = "어떤 소셜 플랫폼인지에 대한 정보", example = "google")
     private String provider;
 

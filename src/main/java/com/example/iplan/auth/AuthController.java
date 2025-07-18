@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
@@ -22,7 +23,7 @@ import java.util.concurrent.ExecutionException;
 @RestController
 @RequiredArgsConstructor
 @Slf4j
-@RequestMapping("/api/auth")
+@RequestMapping("/api")
 public class AuthController {
 
     private final JwtProperties jwtProperties;
@@ -30,21 +31,17 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final UserService userService;
 
-    @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
-        String accessToken = authHeader.replace("Bearer ", "");
-        jwtTokenProvider.destroyToken(accessToken);
-        return ResponseEntity.ok().build();
-    }
-
     @DeleteMapping("/delete-account")
-    public ResponseEntity<?> deleteAccount(@RequestHeader("Authorization") String authHeader) throws ExecutionException, InterruptedException {
+    public ResponseEntity<?> deleteAccount(@RequestHeader("Authorization") String authHeader,
+                                           @RequestHeader("fcm-token") String fcmToken,
+                                           @AuthenticationPrincipal CustomOAuth2UserDetails customOAuth2UserDetails) throws ExecutionException, InterruptedException {
         String accessToken = authHeader.replace("Bearer ", "");
-        userService.withdraw(accessToken); // 탈퇴 처리 서비스 호출
+        String userId = customOAuth2UserDetails.getUsername();
+        userService.withdraw(accessToken, fcmToken, userId); // 탈퇴 처리 서비스 호출
         return ResponseEntity.ok(Map.of("message", "회원 탈퇴가 완료되었습니다."));
     }
 
-    @PostMapping("/refresh")
+    @PostMapping("/auth/refresh")
     public ResponseEntity<?> refreshAccessToken(@RequestBody TokenRefreshRequestDTO request) throws Exception {
         String accessToken = request.getAccessToken();
         String refreshToken = request.getRefreshToken();
@@ -77,9 +74,9 @@ public class AuthController {
         Date expirationDate = jwtTokenProvider.getExpirationDate(refreshToken);
         long now = System.currentTimeMillis();
         long remainingMillis = expirationDate.getTime() - now;
-//        long oneWeekMillis = 7L * 24 * 60 * 60 * 1000; // 7일
-        // 테스트용: 1분으로 설정
-        long oneWeekMillis = 60 * 1000;
+        long oneWeekMillis = 7L * 24 * 60 * 60 * 1000; // 7일
+//         테스트용: 1분으로 설정
+//        long oneWeekMillis = 60 * 1000;
 
         // 5. accessToken 은 항상 새로 발급
         // 6. refreshToken 은 조건에 따라 새로 발급하거나 유지
