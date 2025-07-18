@@ -73,7 +73,7 @@ public class FcmTokenService {
                 fcmTokenRepository.delete(tokenToDelete);
                 log.info("FCM 토큰 삭제 완료: userId={}, token={}", userId, token);
             } else {
-                throw new CustomException("삭제할 FCM 토큰이 존재하지 않음: token = {}" + token, HttpStatus.NOT_FOUND);
+                throw new CustomException("삭제할 FCM 토큰이 존재하지 않음: token = " + token, HttpStatus.NOT_FOUND);
             }
         } catch (ExecutionException | InterruptedException e) {
             log.error("FCM 토큰 삭제 실패", e);
