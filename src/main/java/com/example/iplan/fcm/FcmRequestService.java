@@ -19,7 +19,7 @@ public class FcmRequestService {
      * FCM DTO 기반 푸시 알림 전송
      * @param requestDTO 푸시 알림에 필요한 FCM 토큰 및 메시지 내용
      */
-    public void sendPush(FcmRequestDTO requestDTO) throws JsonProcessingException, FirebaseMessagingException {
+    public void sendPush(FcmRequestDTO requestDTO) throws JsonProcessingException {
         // FCM 메시지 data 구성 -> json 변환
         String dataJson = objectMapper.writeValueAsString(requestDTO.getData());
         log.info("Before: {}", requestDTO.getData());
