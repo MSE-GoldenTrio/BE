@@ -5,6 +5,7 @@ import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.RewardChildRepository;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.Users;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ public class RewardParentsService {
 
     private final RewardChildRepository rewardChildRepository;
     private final UserRepository userRepository;
+    private final AES256Encryptor aes;
 
     /**
      * 여러 자녀 닉네임을 기반으로 모든 자녀의 보상 목록 반환
@@ -49,6 +51,10 @@ public class RewardParentsService {
 
         try {
             List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(nickname);
+
+            for(RewardChildDTO dto : rewards){
+                dto.setContent(aes.decrypt(dto.getContent()));
+            }
 
             if (rewards == null || rewards.isEmpty()) {
                 response.put("success", false);

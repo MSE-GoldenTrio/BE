@@ -49,7 +49,7 @@ public class RewardChildController {
                     }))
     @PostMapping
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> saveReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> saveReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws Exception {
 
         String childNickname = user.getUsername();
         log.info("Received RewardChildDTO: {}, AuthenticationPrincipal email: {}", rewardDto, childNickname);
@@ -109,6 +109,8 @@ public class RewardChildController {
             response.put("success", false);
             response.put("message", "보상 데이터를 가져오는 데 실패했습니다. Error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -157,7 +159,7 @@ public class RewardChildController {
                     }))
     @PatchMapping("/update")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> updateReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updateReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws Exception {
         String childNickname = user.getUsername();
         log.info("Received RewardChildDTO for update reward: {}, AuthenticationPrincipal email: {}", rewardDto, childNickname);
         return rewardChildService.updateReward(rewardDto, childNickname);

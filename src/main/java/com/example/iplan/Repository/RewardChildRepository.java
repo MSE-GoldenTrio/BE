@@ -33,7 +33,6 @@ public class RewardChildRepository extends DefaultFirebaseDBRepository<RewardChi
      * @throws InterruptedException
      */
     public List<RewardChildDTO> findRewardChildDtoByUserId(String userId) throws ExecutionException, InterruptedException {
-        Firestore firestore = FirestoreClient.getFirestore();
         CollectionReference collection = firestore.collection("RewardChild");
 
         ApiFuture<QuerySnapshot> apiFutureList = collection

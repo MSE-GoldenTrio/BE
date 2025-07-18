@@ -6,6 +6,7 @@ import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.RewardChildRepository;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.Users;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,7 @@ public class RewardChildService {
 
     private final RewardChildRepository rewardChildRepository;
     private final UserRepository userRepository;
+    private final AES256Encryptor aes;
     /**
      * 새로운 보상을 저장하는 기능
      * @param rewardDto 저장할 보상 객체의 DTO
@@ -33,7 +35,7 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> saveReward(RewardChildDTO rewardDto, String nickname) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> saveReward(RewardChildDTO rewardDto, String nickname) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
         // 사용자 인증
@@ -43,7 +45,7 @@ public class RewardChildService {
         // 빌더 패턴을 사용하여 RewardChild 객체 생성
         RewardChild reward = RewardChild.builder()
                 .user_id(nickname)
-                .content(rewardDto.getContent())
+                .content(aes.encrypt(rewardDto.getContent()))
                 .post_date(rewardDto.getPost_date())
                 .post_year(rewardDto.getPost_year())
                 .post_month(rewardDto.getPost_month())
@@ -71,9 +73,11 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public RewardChild getReward(String id) throws ExecutionException, InterruptedException {
+    public RewardChild getReward(String id) throws ExecutionException {
         try {
-            return rewardChildRepository.findEntityByDocumentId(id);
+            RewardChild targetReward = rewardChildRepository.findEntityByDocumentId(id);
+            targetReward.setContent(aes.decrypt(targetReward.getContent()));
+            return targetReward;
         } catch (Exception e) {
             throw new ExecutionException("보상 조회에 실패했습니다. Error: " + e, e);
         }
@@ -89,7 +93,7 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public RewardChildDTO getDailyReward(String nickname, int year, int month, int day) throws ExecutionException, InterruptedException {
+    public RewardChildDTO getDailyReward(String nickname, int year, int month, int day) throws Exception {
         String formattedDate = String.format("%04d-%02d-%02d", year, month, day); // "2025-03-28" 형식으로 만들기
 
         RewardChild rewardChild = rewardChildRepository.findRewardChildByDay(nickname, formattedDate);
@@ -104,7 +108,7 @@ public class RewardChildService {
         return RewardChildDTO.builder()
                 .id(rewardChild.getId())
                 .user_id(rewardChild.getUser_id())
-                .content(rewardChild.getContent())
+                .content(aes.decrypt(rewardChild.getContent()))
                 .post_date(rewardChild.getPost_date())
                 .post_year(rewardChild.getPost_year())
                 .post_month(rewardChild.getPost_month())
@@ -129,6 +133,10 @@ public class RewardChildService {
         try {
             // 사용자의 모든 보상을 가져오기
             List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(nickname);
+
+            for(RewardChildDTO dto : rewards){
+                dto.setContent(aes.decrypt(dto.getContent()));
+            }
 
             if (rewards.isEmpty()) {
                 log.info("{}'s reward is not exist.", nickname);
@@ -184,7 +192,7 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> updateReward(RewardChildDTO rewardDto, String nickname) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updateReward(RewardChildDTO rewardDto, String nickname) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
         RewardChild existingReward = rewardChildRepository.findEntityByDocumentId(rewardDto.getId());
@@ -215,7 +223,7 @@ public class RewardChildService {
         RewardChild updatedReward = RewardChild.builder()
                 .id(existingReward.getId())
                 .user_id(rewardDto.getUser_id() != null ? rewardDto.getUser_id() : existingReward.getUser_id())
-                .content(rewardDto.getContent() != null ? rewardDto.getContent() : existingReward.getContent())
+                .content(rewardDto.getContent() != null ? aes.encrypt(rewardDto.getContent()) : existingReward.getContent())
                 .post_date(rewardDto.getPost_date() != null ? rewardDto.getPost_date() : existingReward.getPost_date())
                 .post_year(rewardDto.getPost_date() != null ? rewardDto.getPost_year() : existingReward.getPost_year())
                 .post_month(rewardDto.getPost_date() != null ? rewardDto.getPost_month() : existingReward.getPost_month())
@@ -362,9 +370,17 @@ public class RewardChildService {
 
         // 보상 중에서 해당 기간에 포함되는 rewarded 가 true 인 보상만 필터링하여 리스트 반환
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
-        return rewards.stream().filter(reward -> {
+        return rewards.stream()
+                .filter(reward -> {
                     LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate) && reward.isRewarded();
+                })
+                .peek(reward -> {
+                    try {
+                        reward.setContent(aes.decrypt(reward.getContent()));
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
                 })
                 .toList();
 
@@ -392,6 +408,13 @@ public class RewardChildService {
         return rewards.stream().filter(reward -> {
                     LocalDate rewardDate = LocalDate.parse(reward.getPost_date(), formatter);
                     return !rewardDate.isBefore(startDate) && !rewardDate.isAfter(endDate) && !reward.isRewarded();
+                })
+                .peek(reward -> {
+                    try {
+                        reward.setContent(aes.decrypt(reward.getContent()));
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
                 })
                 .toList();
 
