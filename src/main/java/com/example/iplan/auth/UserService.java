@@ -9,12 +9,14 @@ import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.RefreshTokenService;
+import com.example.iplan.util.AES256Encryptor;
 import com.google.api.client.util.Value;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
@@ -48,22 +50,27 @@ public class UserService {
     private final RefreshTokenService refreshTokenService;
     private final JwtProperties jwtProperties;
 
+    private final AES256Encryptor aes;
+
     // 회원가입
     public String signUp(String nickname, String password, String name, String email, String roleStr) {
         try {
             // 1. 아이디 중복 확인
-            if (nickname != null && userRepository.findByNickname(nickname).isPresent()) {
-                throw new IllegalArgumentException("Nickname already exists.");
+            if (nickname != null && userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname)).isPresent()) {
+                throw new CustomException("Nickname already exists.", HttpStatus.NOT_FOUND);
             }
 
             UserRole role = UserRole.fromString(roleStr);   // Enum 변환
 
             // 2. Users 객체 생성
+            assert nickname != null;
             Users user = Users.builder()
-                    .nickname(nickname)
-                    .email(email)
+                    .nickname(aes.encrypt(nickname))
+                    .nicknameHash(DigestUtils.sha256Hex(nickname)) // 중복 비교용 해시 추가
+                    .email(aes.encrypt(email))
+                    .emailHash(DigestUtils.sha256Hex(email))
                     .password(passwordEncoder.encode(password)) // 비밀번호 암호화
-                    .name(name)
+                    .name(aes.encrypt(name))
                     .authority(role)    // child, parent
                     .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
                     .build();
@@ -73,7 +80,9 @@ public class UserService {
 
             return "Sign Up Successfully";
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Error accessing Firestore", e);
+            throw new CustomException("Error accessing Firestore: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -260,11 +269,16 @@ public class UserService {
         return user.orElse(null);
     }
 
+    public Users findByHashEmail(String email){
+        Optional<Users> user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(email));
+        return user.orElse(null);
+    }
+
     /**
      * 아이디(닉네임 중복 체크
      */
     public boolean isNicknameAvailable(String nickname) {
-        Optional<Users> user = userRepository.findByNickname(nickname);
+        Optional<Users> user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname));
         return user.isEmpty(); // 사용 가능하면 true, 중복이면 false
     }
 
@@ -299,16 +313,16 @@ public class UserService {
     /**
      * 해당 이메일 사용자를 찾아서 비밀번호를 변경한다.
      * 비밀번호는 암호화처리 후 저장
-     * @param email
+     * @param encryptEmail
      * @param rawPassword
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public void updatePasswordByEmail(String email, String rawPassword) throws ExecutionException, InterruptedException {
+    public void updatePasswordByEmail(String encryptEmail, String rawPassword) throws ExecutionException, InterruptedException {
         String encoded = passwordEncoder.encode(rawPassword);
 
         List<QueryDocumentSnapshot> docs = firestore.collection("User")
-                .whereEqualTo("email", email)
+                .whereEqualTo("encryptEmail", encryptEmail)
                 .get()
                 .get()
                 .getDocuments();

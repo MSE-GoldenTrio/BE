@@ -26,9 +26,29 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
         }
     }
 
+    public Optional<Users> findByHashValueEmail(String emailHash) {
+        try {
+            Users user = findByFields(Map.of("emailHash", emailHash)); // 아이디(닉네임) 기반으로 조회
+            return Optional.ofNullable(user);
+        } catch (ExecutionException | InterruptedException e) {
+            e.printStackTrace();
+            return Optional.empty();
+        }
+    }
+
     public Optional<Users> findByNickname(String nickname) {
         try {
             Users user = findByFields(Map.of("nickname", nickname)); // 아이디(닉네임) 기반으로 조회
+            return Optional.ofNullable(user);
+        } catch (ExecutionException | InterruptedException e) {
+            e.printStackTrace();
+            return Optional.empty();
+        }
+    }
+
+    public Optional<Users> findByHashValueNickName(String nicknameHash) {
+        try {
+            Users user = findByFields(Map.of("nicknameHash", nicknameHash)); // 아이디(닉네임) 기반으로 조회
             return Optional.ofNullable(user);
         } catch (ExecutionException | InterruptedException e) {
             e.printStackTrace();

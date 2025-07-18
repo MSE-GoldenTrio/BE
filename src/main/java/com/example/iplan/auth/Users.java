@@ -24,8 +24,13 @@ public class Users {
     @Schema(description = "사용자 아이디", example = "alice", requiredMode = Schema.RequiredMode.REQUIRED)
     private String nickname;
 
+    @Schema(description = "사용자 아이디 해시값, 중복 비교용")
+    private String nicknameHash;
+
     @Schema(description = "사용자 이메일", example = "abcd@gmail.com", requiredMode = Schema.RequiredMode.REQUIRED)
     private String email;
+
+    private String emailHash;
 
     @NotNull
     @Schema(description = "사용자 비밀번호", example = "dlkjeigoidjlkajlckd", requiredMode = Schema.RequiredMode.REQUIRED)

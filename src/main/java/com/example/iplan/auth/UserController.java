@@ -6,6 +6,7 @@ import com.example.iplan.auth.DTO.SignUpDTO;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
+import com.example.iplan.util.AES256Encryptor;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,10 +32,12 @@ public class UserController {
     private final UserService userService;
     private final PasswordResetService passwordResetService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AES256Encryptor aes;
 
     @PostMapping("/auth/register")
     @Operation(summary = "회원가입")
     public ResponseEntity<String> signUp(@RequestBody SignUpDTO signUpDto){
+        log.info("회원가입 시작: "+signUpDto.getNickname());
         try {
             String nickname = signUpDto.getNickname();
             String password = signUpDto.getPassword();
@@ -79,7 +82,7 @@ public class UserController {
      * 닉네임으로 사용자 정보 조회 -> 전체 정보 반환!!
      */
     @GetMapping("/unknown/user-info")
-    public ResponseEntity<Map<String, Object>> getUserInfo(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails) {
+    public ResponseEntity<Map<String, Object>> getUserInfo(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails) throws Exception {
 
         log.info("Checking user info by nickname..");
         String nickname = userDetails.getUsername();
@@ -97,8 +100,8 @@ public class UserController {
         // 사용자 정보를 Map으로 변환하여 반환
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("id", user.getId());
-        userInfo.put("nickname", user.getNickname());
-        userInfo.put("email", user.getEmail());
+        userInfo.put("nickname", aes.decrypt(user.getNickname()));
+        userInfo.put("email", aes.decrypt(user.getEmail()));
         userInfo.put("name", user.getName());
         userInfo.put("authority", user.getAuthority().name());
         userInfo.put("linked_id", user.getLinked_id() != null ? user.getLinked_id() : ""); // null 방지
@@ -112,7 +115,7 @@ public class UserController {
      * 소셜 로그인 성공 이후 추가 정보(역할) 업데이트 및 새로운 JWT 발급
      */
     @PostMapping("/unknown/update-role")
-    public ResponseEntity<Map<String, String>> updateUserRole(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails, @RequestBody Map<String, String> requestBody) {
+    public ResponseEntity<Map<String, String>> updateUserRole(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails, @RequestBody Map<String, String> requestBody) throws Exception {
 
         log.info("Update user role by nickname..");
         String nickname = userDetails.getUsername();
@@ -164,7 +167,6 @@ public class UserController {
      */
     @GetMapping("/change-password")
     public ResponseEntity<?> changePassword(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails) {
-        System.out.println("컨트롤러 진입");
         if (userDetails == null) {
             System.out.println("인증 사용자 정보가 존재하지 않습니다.");
             throw new CustomException("인증 정보가 유효하지 않습니다. 다시 로그인 해주세요.", HttpStatus.BAD_REQUEST);
@@ -172,7 +174,7 @@ public class UserController {
 
         try {
             String email = userDetails.getEmail();
-            System.out.println("비밀번호 변경 요청 이메일: " + email);
+            System.out.println("비밀번호 변경 요청 이메일: " + aes.decrypt(email));
             passwordResetService.sendResetLink(email);
             return ResponseEntity.ok(Map.of("message", "이메일 전송에 성공했습니다."));
         } catch (Exception e) {
@@ -188,9 +190,12 @@ public class UserController {
      * @return
      */
     @PostMapping("/auth/reset-password-request")
-    public ResponseEntity<?> requestResetPassword(@RequestBody Map<String, String> payload) throws ExecutionException, InterruptedException {
+    public ResponseEntity<?> requestResetPassword(@RequestBody Map<String, String> payload) throws Exception {
         String email = payload.get("email");
-        Users user = userService.findByEmail(email);
+        Users user = userService.findByHashEmail(email);
+
+        if(user == null) user = userService.findByEmail(email);
+
         System.out.println("Email: " + email);
         System.out.println("User: " + user);
 
@@ -216,8 +221,6 @@ public class UserController {
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> payload) throws ExecutionException, InterruptedException {
         String token = payload.get("token");
         String newPassword = payload.get("newPassword");
-
-        System.out.println("Token: " + token + ", New Password: " + newPassword);
 
         passwordResetService.resetPassword(token, newPassword);
 
@@ -269,7 +272,6 @@ public class UserController {
         }else{
             throw new CustomException("사용자의 이메일을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
         }
-
     }
 
 }
