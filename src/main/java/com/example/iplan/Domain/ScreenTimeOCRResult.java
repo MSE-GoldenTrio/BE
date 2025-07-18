@@ -1,5 +1,7 @@
 package com.example.iplan.Domain;
 
+import com.example.iplan.DTO.ScreenTimeResultDTO;
+import com.example.iplan.util.AES256Encryptor.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.google.cloud.firestore.annotation.DocumentId;
 import com.google.firebase.database.annotations.NotNull;
@@ -24,7 +26,7 @@ public class ScreenTimeOCRResult {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private String date;
 
-    private Map<String, Object> result;
+    private String result;
 
     private boolean isSuccess;
 }

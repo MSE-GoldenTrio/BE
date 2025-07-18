@@ -32,7 +32,7 @@ public class ParentScreenTimeController {
     }
 
     @GetMapping("/showScreenTimeGraph/{targetDate}")
-    public ResponseEntity<Map<String, Object>> GetScreenTimeGraph(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String targetDate) throws ExecutionException, InterruptedException{
+    public ResponseEntity<Map<String, Object>> GetScreenTimeGraph(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String targetDate) throws Exception {
         System.out.println("User ID: " + user.getUsername() + ", Target Date: " + targetDate );
 
         return parentScreenTimeService.getScreenTimeGraph(user.getUsername(), targetDate);
