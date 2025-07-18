@@ -7,6 +7,7 @@ import com.example.iplan.Domain.ScreenTime;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
+import com.example.iplan.util.AES256Encryptor;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +26,7 @@ public class PlanChildService {
 
     private final PlanChildRepository planChildRepository;
     private final SetScreenTimeRepository setScreenTimeRepository;
-    private final DayDataService dayDataService;
+    private final AES256Encryptor aes;
 
     /**
      * 새로운 계획을 추가하는 기능
@@ -36,15 +37,18 @@ public class PlanChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> postChildNewPlan(PlanChildDTO planPostDto, String user_id) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> postChildNewPlan(PlanChildDTO planPostDto, String user_id) throws Exception {
         Map<String, Object> response = new HashMap<>();
+
+        String encryptedTitle = aes.encrypt(planPostDto.getTitle());
+        String encryptedMemo = aes.encrypt(planPostDto.getMemo());
 
         PlanChild planPost = PlanChild.builder()
                 .user_id(user_id)
                 .alarm(planPostDto.isAlarm())
-                .memo(planPostDto.getMemo())
+                .memo(encryptedMemo)
                 .category_id(planPostDto.getCategory_id())
-                .title(planPostDto.getTitle())
+                .title(encryptedTitle)
                 .post_year(planPostDto.getPost_year())
                 .post_month(planPostDto.getPost_month())
                 .post_day(planPostDto.getPost_day())
@@ -101,7 +105,7 @@ public class PlanChildService {
     /**
      * 날짜 제한 없이 사용자의 모든 계획 목록을 반환
      */
-    public Map<String, Object> getAllPlans(String childNickname) throws ExecutionException, InterruptedException {
+    public Map<String, Object> getAllPlans(String childNickname) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
         // childNickname 기준으로 Firestore에서 모든 계획 가져오기
@@ -116,6 +120,8 @@ public class PlanChildService {
                 if (plan.getId() == null) {
                     plan.setId(UUID.randomUUID().toString()); // ID가 없으면 임시 ID 부여
                 }
+                plan.setTitle(aes.decrypt(plan.getTitle()));
+                plan.setMemo(aes.decrypt(plan.getMemo()));
             }
             response.put("success", true);
             response.put("plans", plans);
@@ -124,13 +130,16 @@ public class PlanChildService {
         return response;
     }
 
-    public ResponseEntity<Map<String, Object>> findByPlanID(String documentID) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> findByPlanID(String documentID) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
         PlanChild planChild = planChildRepository.findEntityByDocumentId(documentID);
         if(planChild == null){
             throw new CustomException("해당 ID의 PlanChild문서가 없습니다.", HttpStatus.NOT_FOUND);
         }
+
+        planChild.setTitle(aes.decrypt(planChild.getTitle()));
+        planChild.setMemo(aes.decrypt(planChild.getMemo()));
 
         response.put("success", true);
         response.put("message", "해당 ID PlanChild문서 찾는데 성공했습니다.");
@@ -146,7 +155,7 @@ public class PlanChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> updateOriginalPlan(PlanChildDTO planChildDTO, String user_id) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updateOriginalPlan(PlanChildDTO planChildDTO, String user_id) throws Exception {
 
         Map<String, Object> response = new HashMap<>();
 
@@ -161,8 +170,8 @@ public class PlanChildService {
             throw new CustomException("해당 계획과 사용자가 일치하지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
-        updateIfNotNull(planChildDTO.getTitle(), originalPlan::setTitle);
-        updateIfNotNull(planChildDTO.getMemo(), originalPlan::setMemo);
+        updateIfNotNull(aes.encrypt(planChildDTO.getTitle()), originalPlan::setTitle);
+        updateIfNotNull(aes.encrypt(planChildDTO.getMemo()), originalPlan::setMemo);
         updateIfNotNull(planChildDTO.getCategory_id(), originalPlan::setCategory_id);
         updateIfNotNull(planChildDTO.getPlan_start_time(), originalPlan::setPlan_start_time);
         updateIfNotNull(planChildDTO.getPlan_end_time(), originalPlan::setPlan_end_time);

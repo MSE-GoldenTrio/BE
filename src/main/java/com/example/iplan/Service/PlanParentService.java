@@ -2,6 +2,7 @@ package com.example.iplan.Service;
 
 import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Repository.PlanChildRepository;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,12 @@ import java.util.concurrent.ExecutionException;
 public class PlanParentService {
 
     private final PlanChildRepository planChildRepository;
+    private final AES256Encryptor aes;
 
     /**
      * 여러 자녀 닉네임을 기반으로 모든 자녀의 계획 목록 반환
      */
-    public Map<String, Object> getPlansForAllChildren(List<String> childNicknames) throws ExecutionException, InterruptedException {
+    public Map<String, Object> getPlansForAllChildren(List<String> childNicknames) throws Exception {
         Map<String, Object> allPlans = new HashMap<>();
 
         for (String childNickname : childNicknames) {
@@ -36,7 +38,7 @@ public class PlanParentService {
     /**
      * 날짜 제한 없이 사용자와 연동된 유저의 모든 계획 목록 반환
      */
-    public Map<String, Object> getAllPlans(String childNickname) throws ExecutionException, InterruptedException {
+    public Map<String, Object> getAllPlans(String childNickname) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
         // childNickname 기반으로 아이의 모든 계획 가져오기
@@ -52,6 +54,9 @@ public class PlanParentService {
                 if (plan.getId() == null) {
                     throw new IllegalStateException("계획 ID가 없는 데이터가 존재합니다. DB 무결성을 확인해주세요.");
                 }
+
+                plan.setTitle(aes.decrypt(plan.getTitle()));
+                plan.setMemo(aes.decrypt(plan.getMemo()));
             }
             response.put("success", true);
             response.put("plans", plans);

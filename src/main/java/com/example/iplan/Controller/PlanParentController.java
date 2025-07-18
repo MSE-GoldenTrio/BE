@@ -37,7 +37,7 @@ public class PlanParentController {
     @GetMapping("/list")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getAllChildPlanList(
-            @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+            @AuthenticationPrincipal CustomOAuth2UserDetails user) throws Exception {
 
         List<String> linkedIds = user.getUser().getLinked_id();
 
@@ -60,7 +60,7 @@ public class PlanParentController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getPlanListByChildIndex(
             @PathVariable int index,
-            @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+            @AuthenticationPrincipal CustomOAuth2UserDetails user) throws Exception {
 
         String parentNickname = user.getUsername();
         List<String> linkedIds = user.getUser().getLinked_id();
