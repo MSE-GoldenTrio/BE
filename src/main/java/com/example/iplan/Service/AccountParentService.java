@@ -103,7 +103,7 @@ public class AccountParentService {
                 for(FcmToken fcmToken : fcmTokens){
                     log.info("아이의 fcmToken: {}", fcmToken.getToken());
                     FcmRequestDTO requestDTO = FcmRequestDTO.builder()
-                            .user_id(childUser.getId())
+                            .user_id(fcmToken.getUser_id())
                             .fcmToken(fcmToken.getToken())
                             .notification(FcmRequestDTO.Notification.builder()
                                     .title("iPlan")
