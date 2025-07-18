@@ -9,6 +9,10 @@ import com.example.iplan.auth.Users;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
+import com.example.iplan.fcm.FcmRequestDTO;
+import com.example.iplan.fcm.FcmRequestService;
+import com.example.iplan.fcm.FcmToken;
+import com.example.iplan.fcm.FcmTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -31,6 +35,8 @@ public class AccountParentService {
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final FcmRequestService fcmRequestService;
+    private final FcmTokenService fcmTokenService;
 
     /**
      * 부모가 자녀 닉네임을 입력하여 연동 요청을 보냄
@@ -86,8 +92,40 @@ public class AccountParentService {
 
         // 6. 저장
         accountRepository.saveWithAutoIncrement(request);
+        log.info("PendingAccountRequest 저장 완료: {}", request.getId());
 
-        // 7. 응답 반환
+        // 7. 연동 요청을 보낼 아이의 FcmToken 찾기
+        List<FcmToken> fcmTokens = fcmTokenService.getTokensByUserId(childUser.getNickname());
+
+        try {
+            if(!fcmTokens.isEmpty()){
+                // 8. 아이의 존재하는 모든 FcmToken 으로 푸시알림 전송
+                for(FcmToken fcmToken : fcmTokens){
+                    log.info("아이의 fcmToken: {}", fcmToken.getToken());
+                    FcmRequestDTO requestDTO = FcmRequestDTO.builder()
+                            .user_id(childUser.getId())
+                            .fcmToken(fcmToken.getToken())
+                            .notification(FcmRequestDTO.Notification.builder()
+                                    .title("iPlan")
+                                    .body(parentNickname + " 부모님이 연동 요청을 보냈습니다. 눌러서 확인하세요.")
+                                    .build())
+                            .data(FcmRequestDTO.Data.builder()
+                                    .pendingRequestId(request.getId())
+                                    .sender(parentNickname)
+                                    .type("AccountLinkRequest")
+                                    .build())
+                            .build();
+                    fcmRequestService.sendPush(requestDTO);
+                    log.info("연동 요청 푸시알림을 성공적으로 보냈습니다.");
+                }
+            } else {
+                log.warn("연동 요청을 보낼 아이({})의 FcmToken 이 존재하지 않습니다.", childUser.getNickname());
+            }
+        } catch (Exception e) {
+            throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        // 9. 응답 반환
         response.put("success", true);
         response.put("message", "자녀에게 연동 요청이 전송되었습니다.");
         return new ResponseEntity<>(response, HttpStatus.OK);
