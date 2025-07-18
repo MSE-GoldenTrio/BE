@@ -8,6 +8,7 @@ import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.Blacklist;
 import com.example.iplan.auth.redis.BlacklistRepository;
 import com.example.iplan.auth.redis.RefreshTokenService;
+import com.example.iplan.util.AES256Encryptor;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -33,6 +34,8 @@ public class JwtTokenProvider {
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
 
+    private final AES256Encryptor aes;
+
 //    public static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24; // 24시간
 //    public static final long REFRESH_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24 * 30; // 30일
 
@@ -40,7 +43,8 @@ public class JwtTokenProvider {
     public JwtTokenProvider(
             RefreshTokenService refreshTokenService,
             BlacklistRepository blacklistRepository,
-            JwtProperties jwtProperties
+            JwtProperties jwtProperties,
+            AES256Encryptor aes
     ) {
         this.refreshTokenService = refreshTokenService;
         this.blacklistRepository = blacklistRepository;
@@ -50,10 +54,11 @@ public class JwtTokenProvider {
 
         byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecret());
         this.key = Keys.hmacShaKeyFor(keyBytes);
+        this.aes = aes;
     }
 
     // CustomOAuth2UserDetails 정보를 가지고 AccessToken, RefreshToken을 생성하는 메서드
-    public JwtToken generateToken(Authentication authentication) {
+    public JwtToken generateToken(Authentication authentication) throws Exception {
         if (authentication == null || authentication.getPrincipal() == null) {
             throw new RuntimeException("JWT 생성 실패: 인증 정보가 없습니다.");
         }
@@ -80,8 +85,8 @@ public class JwtTokenProvider {
         // Access Token 생성
         Date accessTokenExpiresIn = new Date(now + accessTokenExpiration);
         String accessToken = Jwts.builder()
-                .setSubject(nickname)
-                .claim("email", email)
+                .setSubject(aes.decrypt(nickname))
+                .claim("email", aes.decrypt(email))
                 .claim("role", role.name()) // Enum 값 저장 (CHILD, PARENT)
                 .claim("linked_id", linked_id)  // 리스트로 저장
                 .setExpiration(accessTokenExpiresIn)
@@ -103,7 +108,7 @@ public class JwtTokenProvider {
     }
 
     // Jwt 토큰을 복호화(디코딩)하여 토큰에 들어있는 사용자 정보 추출
-    public Authentication getAuthentication(String accessToken) {
+    public Authentication getAuthentication(String accessToken) throws Exception {
         // Jwt 토큰 복호화
         Claims claims = parseClaims(accessToken);
         log.info("[JwtTokenProvider getAuthentication]");
@@ -131,8 +136,8 @@ public class JwtTokenProvider {
         CustomOAuth2UserDetails principal = new CustomOAuth2UserDetails(
                 Users.builder()
                         .name("")
-                        .email(email)
-                        .nickname(nickname)  // 토큰에서 추출한..
+                        .email(aes.encrypt(email))
+                        .nickname(aes.encrypt(nickname))  // 토큰에서 추출한..
                         .password("")
                         .authority(role)    // Enum 값 그대로 사용
                         .linked_id(linked_id)
@@ -208,7 +213,7 @@ public class JwtTokenProvider {
     }
 
     // AccessToken 재발급
-    public String generateNewAccessToken(Authentication authentication) {
+    public String generateNewAccessToken(Authentication authentication) throws Exception {
         CustomOAuth2UserDetails userDetails = (CustomOAuth2UserDetails) authentication.getPrincipal();
 
         String nickname = userDetails.getUser().getNickname();
@@ -220,8 +225,8 @@ public class JwtTokenProvider {
         Date accessTokenExpiresIn = new Date(now + accessTokenExpiration);
 
         return Jwts.builder()
-                .setSubject(nickname)
-                .claim("email", email)
+                .setSubject(aes.decrypt(nickname))
+                .claim("email", aes.decrypt(email))
                 .claim("role", role.name())
                 .claim("linked_id", linked_id)
                 .setExpiration(accessTokenExpiresIn)
