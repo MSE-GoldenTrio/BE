@@ -45,7 +45,7 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refreshAccessToken(@RequestBody TokenRefreshRequestDTO request) {
+    public ResponseEntity<?> refreshAccessToken(@RequestBody TokenRefreshRequestDTO request) throws Exception {
         String accessToken = request.getAccessToken();
         String refreshToken = request.getRefreshToken();
 

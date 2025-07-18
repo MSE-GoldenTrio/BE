@@ -67,7 +67,7 @@ public class AccountChildService {
      * 이때 아이의 linked_id에 이미 부모가 존재한다면 수락 못하도록 !!
      */
     public String respondToRequest(String childNickname, AccountRequestDTO dto)
-            throws ExecutionException, InterruptedException {
+            throws Exception {
 
         log.info("연동 요청 응답 서비스");
 
