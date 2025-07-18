@@ -4,6 +4,8 @@ import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Service.AlarmService;
 import com.example.iplan.fcm.FcmRequestDTO;
 import com.example.iplan.fcm.FcmRequestService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.firebase.messaging.FirebaseMessagingException;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ExecutionException;
@@ -30,16 +32,23 @@ public class PushTask implements Runnable {
         FcmRequestDTO requestDTO = FcmRequestDTO.builder()
                 .user_id(plan.getUser_id())
                 .fcmToken(fcmToken)
-                .notification(
-                        FcmRequestDTO.Notification.builder()
-                                .title("iPlan")
-                                .body(plan.getTitle() + " 시작할 시간이에요!")
-                                .build()
-                )
+                .notification(FcmRequestDTO.Notification.builder()
+                        .title("iPlan")
+                        .body(plan.getTitle() + " 시작할 시간이에요!")
+                        .build())
+                .data(FcmRequestDTO.Data.builder()
+                        .pendingRequestId(null)
+                        .sender(null)
+                        .type("PlanAlarm")
+                        .build())
                 .build();
 
         // 2. 푸시알림 전송
-        fcmRequestService.sendPush(requestDTO);
+        try {
+            fcmRequestService.sendPush(requestDTO);
+        } catch (JsonProcessingException | FirebaseMessagingException e) {
+            throw new RuntimeException(e);
+        }
 
         // 3. 알림 컬렉션에서 제거
         // 예외 처리 필수 -> PushTask.run() 메서드는 Runnable 인터페이스이므로 예외를 throw 할 수 없음
