@@ -42,7 +42,12 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         }
 
         // JWT 발급
-        JwtToken jwtToken = jwtTokenProvider.generateToken(authentication);
+        JwtToken jwtToken = null;
+        try {
+            jwtToken = jwtTokenProvider.generateToken(authentication);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         log.info("OAuth2 Access Token: {}", jwtToken.getAccessToken());
 
         // React Native 앱으로 리다이렉트 (딥링크 사용)
