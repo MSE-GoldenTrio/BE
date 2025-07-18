@@ -9,14 +9,13 @@ import com.example.iplan.Domain.RewardParents;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.FeedbackRepository;
 import com.example.iplan.Repository.RewardChildRepository;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 public class FeedbackService {
     private final FeedbackRepository feedbackRepository;
     private final RewardChildRepository rewardChildRepository;
+    private final AES256Encryptor aes;
 
     /**
      * 부모님의 보상 코멘트와 별점, 보상 지급 여부를 저장하는 기능
@@ -49,12 +49,14 @@ public class FeedbackService {
                 throw new CustomException("해당 ID의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
             }
 
+            String encryptedComment = aes.encrypt(feedbackDTO.getComment());
+
             // 2. 빌더 패턴을 사용하여 Feedback 객체 생성 및 설정
             Feedback newFeedback = Feedback.builder()
                     .user_id(parentNickname)
                     .child_id(childId)
                     .reward_id(feedbackDTO.getReward_id())
-                    .comment(feedbackDTO.getComment())
+                    .comment(encryptedComment)
                     .grade(feedbackDTO.getGrade())
                     .rewarded(true) // 첨삭 여부 true
                     .success(feedbackDTO.isSuccess())
@@ -95,6 +97,7 @@ public class FeedbackService {
                 for (Feedback feedback : feedbacks) {
                     if (feedback.getId() == null) {
                         feedback.setId(UUID.randomUUID().toString()); // ID가 없으면 임시 ID 부여
+                        feedback.setComment(aes.decrypt(feedback.getComment()));
                     }
                 }
                 response.put("success", true);
@@ -133,7 +136,7 @@ public class FeedbackService {
                     .id(existingFeedback.getId()) // 기존 ID 유지
                     .user_id(existingFeedback.getUser_id())
                     .reward_id(existingFeedback.getReward_id())
-                    .comment(rewardParentsDTO.getComment() != null ? rewardParentsDTO.getComment() : existingFeedback.getComment())
+                    .comment(rewardParentsDTO.getComment() != null ? aes.encrypt(rewardParentsDTO.getComment()) : existingFeedback.getComment())
                     .grade(rewardParentsDTO.getGrade() != 0 ? rewardParentsDTO.getGrade() : existingFeedback.getGrade())
                     .rewarded(true) // 항상 보상 지급 상태를 true로 설정
                     .success(rewardParentsDTO.isSuccess())  // 보상을 회수하는 경우도 가능
