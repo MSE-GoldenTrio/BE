@@ -22,5 +22,5 @@ public class InstalledApps {
     private String user_id;
 
     @NotNull
-    private List<String> installed_apps;
+    private String installed_apps;
 }
