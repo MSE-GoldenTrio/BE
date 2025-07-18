@@ -27,7 +27,6 @@ public class RewardParentsController {
      */
     @Operation(summary = "부모의 자녀 전체 보상 목록 조회 GET", description = "해당 부모와 연동된 모든 자녀의 보상 목록을 가져온다.")
     @GetMapping("/list")
-    @ResponseBody
     public ResponseEntity<Map<String, Object>> getAllChildRewardList(
             @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
 

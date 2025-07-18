@@ -10,13 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -24,7 +19,7 @@ import java.util.concurrent.ExecutionException;
 @Tag(name = "Plan CRUD", description = "부모 화면에서 아이 계획 가져옴")
 @Slf4j
 @RequiredArgsConstructor
-@Controller
+@RestController
 @RequestMapping("parent/plan")
 public class PlanParentController {
 
@@ -35,7 +30,6 @@ public class PlanParentController {
      */
     @Operation(summary = "부모의 자녀 전체 계획 목록 조회 GET", description = "해당 부모와 연동된 모든 자녀의 계획 목록을 가져온다.")
     @GetMapping("/list")
-    @ResponseBody
     public ResponseEntity<Map<String, Object>> getAllChildPlanList(
             @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
 
@@ -57,7 +51,6 @@ public class PlanParentController {
     @Operation(summary = "부모의 아이 계획 목록 조회 GET", description = "해당 부모와 연동된 아이의 전체 계획 목록을 가져온다.")
     @Parameter(description = "조회할 자녀 인덱스")
     @GetMapping("/list/{index}")
-    @ResponseBody
     public ResponseEntity<Map<String, Object>> getPlanListByChildIndex(
             @PathVariable int index,
             @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {

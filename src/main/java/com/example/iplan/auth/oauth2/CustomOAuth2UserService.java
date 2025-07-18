@@ -12,6 +12,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
@@ -42,7 +44,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         OAuth2User oAuth2User = super.loadUser(userRequest);
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
-        String accessToken = userRequest.getAccessToken().getTokenValue();
+        String oAuth2AccessToken = userRequest.getAccessToken().getTokenValue();
 
         // 플랫폼별 사용자 정보 매핑
         // OAuth2UserInfo.of()를 호출하여 표준화된 사용자 정보로 변환
@@ -55,7 +57,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         // 사용자 저장 또는 업데이트 -> user 설정(반환)
-        saveOrUpdate(oAuth2UserInfo, registrationId, accessToken);
+        saveOrUpdate(oAuth2UserInfo, registrationId, oAuth2AccessToken);
         if (user == null) {
             throw new RuntimeException("OAuth2 로그인 중 사용자 정보가 정상적으로 저장되지 않았습니다.");
         }
@@ -70,17 +72,25 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     /**
      * 디비에서 사용자 정보를 조회하고, 없으면 새로 저장
      */
-    private void saveOrUpdate(OAuth2UserInfo oAuth2UserInfo, String provider, String accessToken) {
+    private void saveOrUpdate(OAuth2UserInfo oAuth2UserInfo, String provider, String providerAccessToken) {
         try {
+            // 이메일로 사용자 조회
             Optional<Users> existingUser = userRepository.findByEmail(oAuth2UserInfo.getEmail());
             if (existingUser.isPresent()) {
                 // 1. 기존 회원이 로그인하는 경우
                 user = existingUser.get();
                 user.setProvider(provider);
-                user.setProviderAccessToken(accessToken);
+                user.setProviderAccessToken(providerAccessToken);
                 userRepository.update(user);
+
+                // 일반 로그인 사용자라면 소셜 로그인 거부 -> 비밀번호가 null 이 아님
+                if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+                    throw new OAuth2AuthenticationException(
+                            new OAuth2Error("email_exists", "이미 일반 회원가입된 이메일입니다. 아이디/비밀번호로 로그인하세요.", null)
+                    );
+                }
                 isNewUser = false; // 기존 회원
-                log.info("User already exists: {}", user.getEmail());
+                log.info("소셜 로그인: 기존 유저 {}", user.getEmail());
             } else {
                 // 2. 신규 회원이 로그인하는 경우 -> 랜덤 닉네임 생성 후 저장
                 if (oAuth2UserInfo.getEmail() == null || oAuth2UserInfo.getEmail().isEmpty()) {
@@ -91,19 +101,20 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         .email(oAuth2UserInfo.getEmail())
                         .name(oAuth2UserInfo.getName())
                         .nickname(randomNickname) // 랜덤 닉네임 할당
-                        .password("")
+                        .password("")   // 소셜 로그인은 비밀번호 없음
                         .authority(UserRole.UNKNOWN) // UserRole 타입으로 직접 전달, 아직 권한 미지정
                         .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
                         .provider(provider)
-                        .providerAccessToken(accessToken)
+                        .providerAccessToken(providerAccessToken)
                         .build();
                 userRepository.saveWithAutoIncrement(user);
 
                 isNewUser = true; // 신규 회원
-                log.info("New user registered: {}, Random nickname: {}", user.getEmail(), randomNickname);
+                log.info("신규 소셜 사용자 등록: {}", user.getEmail());
             }
         } catch (ExecutionException | InterruptedException e) {
             log.error("Firestore error: ", e);
+            throw new RuntimeException("서버 오류로 인해 로그인에 실패했습니다.");
         }
     }
 

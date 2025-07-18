@@ -2,11 +2,15 @@ package com.example.iplan.Service;
 
 import com.example.iplan.DTO.PlanChildDTO;
 import com.example.iplan.DTO.ScreenTimeDTO;
+import com.example.iplan.Domain.Alarm;
 import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Domain.ScreenTime;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
+import com.example.iplan.fcm.FcmToken;
+import com.example.iplan.fcm.FcmTokenService;
+import com.example.iplan.scheduler.PushSchedulerService;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +18,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
@@ -25,7 +31,9 @@ public class PlanChildService {
 
     private final PlanChildRepository planChildRepository;
     private final SetScreenTimeRepository setScreenTimeRepository;
-    private final DayDataService dayDataService;
+    private final FcmTokenService fcmTokenService;
+    private final PushSchedulerService pushSchedulerService;
+    private final AlarmService alarmService;
 
     /**
      * 새로운 계획을 추가하는 기능
@@ -54,9 +62,26 @@ public class PlanChildService {
                 .build();
 
         if (planPost.getUser_id() != null && !planPost.getUser_id().isEmpty()) {
-            // Auto Increment된 ID로 저장
+            // 계획 저장
             planChildRepository.saveWithAutoIncrement(planPost);
-            log.info("Saved successfully!! Plan ID: {}", planPost.getId());
+            log.info("Saved successfully!! Plan ID: {}", planPost.getId()); // Auto Increment 된 문서 ID 바로 확인 가능
+
+            // alarm == true 이고 시작 시간이 null 이 아닌 경우 푸시 예약
+            if (planPost.isAlarm() && planPost.getPlan_start_time() != null && !planPost.getPlan_start_time().isBlank()) {
+
+                // 사용자 FCM 토큰 모두 조회
+                List<FcmToken> fcmTokens = fcmTokenService.getTokensByUserId(user_id);
+
+                if (!fcmTokens.isEmpty()) {
+                    for (FcmToken token : fcmTokens) {
+                        // 1. 푸시 알림 예약 + Alarm 에 저장 (서버 재시작 시 다시 불러와야하므로)
+                        pushSchedulerService.schedulePushNotification(planPost, token.getToken());
+                        log.info("푸시 알림 예약 및 Alarm 저장 완료!!");
+                    }
+                } else {
+                    log.warn("FCM 토큰이 존재하지 않아 푸시 예약 생략: user_id = {}", user_id);
+                }
+            }
 
             response.put("success", true);
             response.put("message", "계획이 정상적으로 추가되었습니다.");
@@ -69,8 +94,84 @@ public class PlanChildService {
         }
     }
 
+    /**
+     * 기존의 계획을 수정한다
+     * @param planChildDTO 수정된 계획의 DTO
+     * @param user_id 해당 계획 소유자 id
+     */
+    public ResponseEntity<Map<String, Object>> updateOriginalPlan(PlanChildDTO planChildDTO, String user_id) throws ExecutionException, InterruptedException {
+        Map<String, Object> response = new HashMap<>();
+
+        PlanChild existingPlan = planChildRepository.findEntityByDocumentId(planChildDTO.getId());
+
+        if(existingPlan == null){
+            log.info("계획이 존재하지 않아 수정 불가");
+            throw new CustomException("해당 Id의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
+        }
+        if(!Objects.equals(existingPlan.getUser_id(), user_id)) {
+            log.info("계획 수정 권한이 없음");
+            throw new CustomException("해당 계획에 대한 수정 권한이 없습니다.", HttpStatus.UNAUTHORIZED);
+        }
+
+        // 1. 계획 업데이트
+        PlanChild updatePlan = PlanChild.builder()
+                .id(existingPlan.getId())
+                .user_id(user_id)
+                .alarm(planChildDTO.isAlarm())
+                .memo(planChildDTO.getMemo())
+                .category_id(planChildDTO.getCategory_id())
+                .title(planChildDTO.getTitle())
+                .post_year(planChildDTO.getPost_year())
+                .post_month(planChildDTO.getPost_month())
+                .post_day(planChildDTO.getPost_day())
+                .plan_start_time(planChildDTO.getPlan_start_time())
+                .plan_end_time(planChildDTO.getPlan_end_time())
+                .is_completed(planChildDTO.is_completed())
+                .build();
+        try{
+            planChildRepository.update(updatePlan);
+            log.info("계획 업데이트 성공!!");
+        }
+        catch (Exception e){
+            throw new CustomException("계획 업데이트에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        // 2. 알림 설정에 따른 푸시 예약 처리
+        boolean alarmWasOn = existingPlan.isAlarm();
+        boolean alarmIsNowOn = planChildDTO.isAlarm();
+        boolean hasStartTime = planChildDTO.getPlan_start_time() != null && !planChildDTO.getPlan_start_time().isBlank();
+
+        if (alarmWasOn && !alarmIsNowOn) {
+            // 알림이 꺼졌다면 예약 삭제 + Alarm 문서 삭제
+            pushSchedulerService.cancelScheduledNotification(updatePlan.getId());
+            alarmService.deleteAllByPlanId(updatePlan.getId());
+            log.info("알림 설정 해제로 푸시 예약 및 Alarm 삭제 완료: planId = {}", updatePlan.getId());
+        } else if (alarmIsNowOn && hasStartTime) {
+            // 알림이 설정되었고 시작시간이 있다면 푸시 예약
+            List<FcmToken> fcmTokens = fcmTokenService.getTokensByUserId(user_id);
+
+            if (!fcmTokens.isEmpty()) {
+                for (FcmToken token : fcmTokens) {
+                    // 기존 예약이 있다면 내부적으로 덮어쓰기 처리됨
+                    pushSchedulerService.schedulePushNotification(updatePlan, token.getToken());
+//                    alarmService.saveAlarm(updatePlan.getId(), token.getToken());
+                    log.info("푸시 알림 예약 및 Alarm 저장 완료: planId = {}, token = {}", updatePlan.getId(), token.getToken());
+                }
+            } else {
+                log.warn("계획 수정 중 FCM 토큰이 존재하지 않아 푸시 예약 생략: user_id = {}", user_id);
+            }
+        }
+
+        response.put("success", true);
+        response.put("message", "계획이 정상적으로 업데이트 되었습니다");
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /**
+     * 날짜로 계획 반환
+     */
     public List<PlanChildDTO> findAllPlanInTargetDate(String user_id, @JsonFormat(pattern = "yyy-MM-dd") String targetDate) throws ExecutionException, InterruptedException {
-        List<PlanChild> planEntityList = planChildRepository.findByDate(user_id, targetDate);
+        List<PlanChild> planEntityList = planChildRepository.findPlanByDate(user_id, targetDate);
 
         List<PlanChildDTO> planDtoList = new ArrayList<>();
 
@@ -124,71 +225,32 @@ public class PlanChildService {
         return response;
     }
 
-    public ResponseEntity<Map<String, Object>> findByPlanID(String documentID) throws ExecutionException, InterruptedException {
-        Map<String, Object> response = new HashMap<>();
-
-        PlanChild planChild = planChildRepository.findEntityByDocumentId(documentID);
-        if(planChild == null){
-            throw new CustomException("해당 ID의 PlanChild문서가 없습니다.", HttpStatus.NOT_FOUND);
-        }
-
-        response.put("success", true);
-        response.put("message", "해당 ID PlanChild문서 찾는데 성공했습니다.");
-        response.put("entity", planChild);
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
-
     /**
-     * 기존의 계획을 수정한다
-     * @param planChildDTO 수정된 계획의 DTO
-     * @param user_id 해당 계획 소유자 id
+     * 단일 계획을 삭제한다
+     * @param document_id
      * @return
-     * @throws ExecutionException
-     * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> updateOriginalPlan(PlanChildDTO planChildDTO, String user_id) throws ExecutionException, InterruptedException {
-
-        Map<String, Object> response = new HashMap<>();
-
-        PlanChild originalPlan = planChildRepository.findEntityByDocumentId(planChildDTO.getId());
-
-        if(originalPlan == null){
-            throw new CustomException("해당 Id의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
-        }
-
-        if(!Objects.equals(originalPlan.getUser_id(), user_id))
-        {
-            throw new CustomException("해당 계획과 사용자가 일치하지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        updateIfNotNull(planChildDTO.getTitle(), originalPlan::setTitle);
-        updateIfNotNull(planChildDTO.getMemo(), originalPlan::setMemo);
-        updateIfNotNull(planChildDTO.getCategory_id(), originalPlan::setCategory_id);
-        updateIfNotNull(planChildDTO.getPlan_start_time(), originalPlan::setPlan_start_time);
-        updateIfNotNull(planChildDTO.getPlan_end_time(), originalPlan::setPlan_end_time);
-        updateIfNotNull(planChildDTO.isAlarm(), originalPlan::setAlarm);
-        updateIfNotNull(planChildDTO.is_completed(), originalPlan::set_completed);
-
-        try{
-            planChildRepository.update(originalPlan);
-        }
-        catch (Exception e){
-            throw new CustomException("계획 업데이트에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        log.info("Updated successfully!");
-        response.put("success", true);
-        response.put("message", "계획이 정상적으로 업데이트 되었습니다");
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
-
     public ResponseEntity<Map<String, Object>> DeletePlan(String document_id) {
         Map<String, Object> response = new HashMap<>();
 
         try{
             PlanChild plan = planChildRepository.findEntityByDocumentId(document_id);
-            if(plan == null) throw new CustomException("해당 Id의 PlanChild문서가 없습니다.", HttpStatus.NOT_FOUND);
+
+            if (plan == null)
+                throw new CustomException("해당 Id의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
+
+            // 만약 알림 설정이 되어있는 계획이라면 예약된 푸시 알림 취소 + Alarm 컬렉션에서 삭제
+            if (plan.isAlarm() && plan.getPlan_start_time() != null) {
+                // 1. 푸시알림 예약 삭제 -> planId에 해당하는 fcmToken별 모든 예약
+                pushSchedulerService.cancelScheduledNotification(plan.getId());
+
+                // 2. Alarm 삭제
+                alarmService.deleteAllByPlanId(plan.getId());
+            }
+
+            // 계획 삭제
             planChildRepository.delete(plan);
+            log.info("계획 삭제 완료: {}", plan.getId());
         }
         catch (Exception e){
             throw new CustomException("계획 삭제에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);
@@ -229,14 +291,39 @@ public class PlanChildService {
     }
 
     /**
-     * 제네릭 함수를 정의하여 필드 업데이트 처리
-     * @param newValue 새로 들어오는 값이 null이 아니라면(수정된 값이라면)
-     * @param setter
-     * @param <T>
+     * 푸시알림을 보내야하는 미래의 알림 반환
      */
-    private <T> void updateIfNotNull(T newValue, Consumer<T> setter) {
-        if (newValue != null) {
-            setter.accept(newValue);
+    public List<PlanChild> findFuturePlansWithAlarm(String userId) throws ExecutionException, InterruptedException {
+        // 1. 유저 아이디와 알람 여부로 모든 계획 찾기
+        List<PlanChild> plans = planChildRepository.findPlansWithAlarmByUser(userId);
+
+        // 2. 필터링: 계획의 날짜 + 시작시간 > 현재시간
+        List<PlanChild> futurePlans = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now(); // 현재 시간
+
+        for (PlanChild plan : plans) {
+            try {
+                LocalDateTime planDateTime = LocalDateTime.of(
+                        Integer.parseInt(plan.getPost_year()),
+                        Integer.parseInt(plan.getPost_month()),
+                        Integer.parseInt(plan.getPost_day()),
+                        Integer.parseInt(plan.getPlan_start_time().split(":")[0]),
+                        Integer.parseInt(plan.getPlan_start_time().split(":")[1])
+                );
+
+                long delay = Duration.between(now, planDateTime).toMillis();
+
+                if (delay <= 0) {
+                    log.info("이미 지난 계획 → 푸시 생략");
+                } else {
+                    futurePlans.add(plan);
+                }
+            } catch (Exception e) {
+                log.info("푸시알림을 보낼 계획 필터링 도중 오류 발생");
+            }
         }
+        log.info("향후 푸시알림 보내야하는 계획 모두 가져오기 완료");
+        return futurePlans;
     }
+
 }

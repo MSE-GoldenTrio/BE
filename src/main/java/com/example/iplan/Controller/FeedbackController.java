@@ -1,10 +1,12 @@
 package com.example.iplan.Controller;
 
 import com.example.iplan.DTO.FeedbackDTO;
+import com.example.iplan.DTO.RewardChildDTO;
 import com.example.iplan.Domain.Feedback;
 import com.example.iplan.Domain.RewardParents;
 import com.example.iplan.Service.FeedbackService;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
+import com.google.firebase.database.annotations.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -32,6 +34,15 @@ public class FeedbackController {
 
         String parentNickname = user.getUsername();
         return feedbackService.saveFeedback(feedbackDTO, parentNickname);
+    }
+
+    // 피드백 수정
+    @PatchMapping("/parent/feedback/update")
+    public ResponseEntity<Map<String, Object>> updateReward(@RequestBody FeedbackDTO feedbackDTO, @AuthenticationPrincipal CustomOAuth2UserDetails user)
+            throws ExecutionException, InterruptedException {
+
+        String parentNickname = user.getUsername();
+        return feedbackService.updateFeedback(feedbackDTO, parentNickname);
     }
 
     // 부모가 해당하는 아이에 대한 모든 피드백 가져옴 (child, parent 요청 모두 가능)
@@ -62,8 +73,4 @@ public class FeedbackController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @PatchMapping
-    public ResponseEntity<Map<String, Object>> updateRewardParents(@RequestBody FeedbackDTO rewardParents) throws ExecutionException, InterruptedException {
-        return feedbackService.updateRewardParents(rewardParents);
-    }
 }

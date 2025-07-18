@@ -86,8 +86,8 @@ public class AccountChildService {
         log.info("연동 요청 승인 여부: {}", dto.isApproved());
 
         // 2. 사용자 정보 조회
-        Users childUser = userRepository.findByFields(Map.of("nickname", childNickname));
-        Users parentUser = userRepository.findByFields(Map.of("nickname", parentNickname));
+        Users childUser = userRepository.findByField("nickname", childNickname);
+        Users parentUser = userRepository.findByField("nickname", parentNickname);
 
         if (childUser == null || parentUser == null) {
             throw new CustomException("유저 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);

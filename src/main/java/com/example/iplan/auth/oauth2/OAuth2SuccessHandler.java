@@ -29,7 +29,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
-        log.info("OAuth2 Login Successfully: {}", authentication.getName());
+        log.info("소셜로그인 성공: {}", authentication.getName());
 
         // 사용자 정보 가져오기
         Users user = customOAuth2UserService.getUser();
@@ -44,10 +44,12 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         // JWT 발급
         JwtToken jwtToken = jwtTokenProvider.generateToken(authentication);
         log.info("OAuth2 Access Token: {}", jwtToken.getAccessToken());
+        log.info("OAuth2 Refresh Token: {}", jwtToken.getRefreshToken());
 
         // React Native 앱으로 리다이렉트 (딥링크 사용)
-        String redirectUrl = String.format("iplan://auth-callback?token=%s&needsAdditionalInfo=%s",
+        String redirectUrl = String.format("iplan://auth-callback?accessToken=%s&refreshToken=%s&needsAdditionalInfo=%s",
                 URLEncoder.encode(jwtToken.getAccessToken(), StandardCharsets.UTF_8),
+                URLEncoder.encode(jwtToken.getRefreshToken(), StandardCharsets.UTF_8),
                 isNewUser);
 
         log.info("OAuth2 Redirect to : {}", redirectUrl);

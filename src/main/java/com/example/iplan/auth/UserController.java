@@ -6,6 +6,9 @@ import com.example.iplan.auth.DTO.SignUpDTO;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.FirebaseToken;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,18 +39,34 @@ public class UserController {
     @Operation(summary = "회원가입")
     public ResponseEntity<String> signUp(@RequestBody SignUpDTO signUpDto){
         try {
+            String idToken = signUpDto.getIdToken();
+            log.info("Firebase 본인인증 토큰: {}", idToken);
+
+            // firebase ID 토큰 검증
+            FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
+
+            if (!decodedToken.isEmailVerified()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("이메일 본인인증이 완료되지 않았습니다.");
+            }
+
+            // Firebase 토큰에서 검증된 이메일 추출 (기존에는 SignUpDTO email)
+            String verifiedEmail = decodedToken.getEmail();
+
             String nickname = signUpDto.getNickname();
             String password = signUpDto.getPassword();
             String name = signUpDto.getName();
-            String email = signUpDto.getEmail();
             String authority = signUpDto.getAuthority();
-            log.info("Register request: nickname = {}, password = {}, name = {}, email = {}, authority: {}", nickname, password, name, email, authority);
+            log.info("Register request: nickname = {}, password = {}, name = {}, email = {}, authority: {}", nickname, password, name, verifiedEmail, authority);
 
-            String result = userService.signUp(nickname, password, name, email, authority);
+            String result = userService.signUp(nickname, password, name, verifiedEmail, authority);
             log.info("Register result: {}", result);
+
             return ResponseEntity.ok(result);
+
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (FirebaseAuthException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("유효하지 않은 Firebase 토큰입니다.");
         }
     }
 
@@ -74,6 +93,14 @@ public class UserController {
         return ResponseEntity.ok(Map.of("available", isAvailable));
     }
 
+    @PostMapping("/auth/check-email")
+    @Operation(summary = "중복 이메일 체크")
+    public ResponseEntity<Map<String, Boolean>> checkEmail(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        log.info("Request email = {}", email);
+        boolean isAvailable = userService.isEmailAvailable(email);
+        return ResponseEntity.ok(Map.of("available", isAvailable));
+    }
 
     /**
      * 닉네임으로 사용자 정보 조회 -> 전체 정보 반환!!
@@ -102,7 +129,6 @@ public class UserController {
         userInfo.put("name", user.getName());
         userInfo.put("authority", user.getAuthority().name());
         userInfo.put("linked_id", user.getLinked_id() != null ? user.getLinked_id() : ""); // null 방지
-        userInfo.put("fcmToken", user.getFcmToken() != null ? user.getFcmToken() : ""); // null 방지
 
         log.info("Received user info: {}", userInfo);
         return ResponseEntity.ok(userInfo);
