@@ -46,7 +46,7 @@ public class PushTask implements Runnable {
         // 2. 푸시알림 전송
         try {
             fcmRequestService.sendPush(requestDTO);
-        } catch (JsonProcessingException | FirebaseMessagingException e) {
+        } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
 
