@@ -9,15 +9,16 @@ import com.example.iplan.auth.Users;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -28,13 +29,14 @@ public class AccountChildService {
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AES256Encryptor aes;
 
     /**
      * 자녀가 부모의 연동 요청을 확인
      * 아직 승인되지 않은 요청만 필터링 (approved == false && status == pending)
      * 반환값은 List<AccountRequestDTO> 형태
      */
-    public List<AccountRequestDTO> getPendingRequestsForChild(String childNickname) throws ExecutionException, InterruptedException {
+    public List<AccountRequestDTO> getPendingRequestsForChild(String childNickname) throws Exception {
         // 1. 자녀가 존재하는지 확인
         Users user = userRepository.findByNickname(childNickname)
                 .orElseThrow(() -> new CustomException("자녀 닉네임에 해당하는 사용자가 존재하지 않습니다.", HttpStatus.NOT_FOUND));
@@ -43,10 +45,10 @@ public class AccountChildService {
 
         try {
             // 2. 승인되지 않은 pending 요청만 필터링
-            List<PendingAccountRequest> pendingList = accountRepository.findByChildNicknameAndApprovedAndStatus(childNickname, false, "pending");
+            List<PendingAccountRequest> pendingList = accountRepository.findByChildNicknameAndApprovedAndStatus(DigestUtils.sha256Hex(aes.decrypt(childNickname)), false, "pending");
 
             if (pendingList.isEmpty()) {
-                log.info("No pending account requests found for child: {}", childNickname);
+                log.info("No pending account requests found for child: {}", aes.decrypt(childNickname));
             } else {
                 log.info("Pending account requests retrieved. Count: {}", pendingList.size());
             }
@@ -57,7 +59,7 @@ public class AccountChildService {
                     .toList();
 
         } catch (Exception e) {
-            log.error("Error while fetching account requests for child [{}]: {}", childNickname, e.getMessage());
+            log.error("Error while fetching account requests for child [{}]: {}", aes.decrypt(childNickname), e.getMessage());
             throw new ExecutionException("계정 연동 요청을 가져오는 중 오류가 발생했습니다.", e);
         }
     }
@@ -77,17 +79,17 @@ public class AccountChildService {
             throw new CustomException("해당 요청이 존재하지 않습니다.", HttpStatus.NOT_FOUND);
         }
 
-        if (!request.getChildNickname().equals(childNickname)) {
+        if (!request.getChildHashedNickname().equals(DigestUtils.sha256Hex(aes.decrypt(childNickname)))) {
             throw new CustomException("본인의 요청만 처리할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
 
-        String parentNickname = request.getParentNickname();
+        String parentNickname = request.getParentHashedNickname();
         log.info("Parent Nickname: {}", parentNickname);
         log.info("연동 요청 승인 여부: {}", dto.isApproved());
 
         // 2. 사용자 정보 조회
-        Users childUser = userRepository.findByField("nickname", childNickname);
-        Users parentUser = userRepository.findByField("nickname", parentNickname);
+        Users childUser = userRepository.findByNickname(childNickname).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Users parentUser = userRepository.findByHashValueNickName(parentNickname).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (childUser == null || parentUser == null) {
             throw new CustomException("유저 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
@@ -107,8 +109,8 @@ public class AccountChildService {
             request.setStatus("approved");
             accountRepository.update(request);
 
-            if (!childUser.getLinked_id().contains(parentNickname)) {
-                childUser.getLinked_id().add(parentNickname);
+            if (!childUser.getLinked_id().contains(parentUser.getNickname())) {
+                childUser.getLinked_id().add(parentUser.getNickname());
             }
             if (!parentUser.getLinked_id().contains(childNickname)) {
                 parentUser.getLinked_id().add(childNickname);

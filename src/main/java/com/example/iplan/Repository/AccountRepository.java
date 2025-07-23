@@ -83,8 +83,8 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
     public AccountRequestDTO convertToDTO(PendingAccountRequest entity) {
         return AccountRequestDTO.builder()
                 .id(entity.getId())
-                .childNickname(entity.getChildNickname())
-                .parentNickname(entity.getParentNickname())
+                .childNickname(entity.getChildHashedNickname())
+                .parentNickname(entity.getParentHashedNickname())
                 .approved(entity.isApproved())
                 .build();
     }

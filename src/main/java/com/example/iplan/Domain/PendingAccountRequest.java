@@ -16,8 +16,8 @@ public class PendingAccountRequest {
     @DocumentId
     private String id;
 
-    private String childNickname;
-    private String parentNickname;
+    private String childHashedNickname;
+    private String parentHashedNickname;
     private boolean approved; // 자녀가 승인했는지 여부
     private String status;  // 요청 상태 (pending, approved, denied)
 }

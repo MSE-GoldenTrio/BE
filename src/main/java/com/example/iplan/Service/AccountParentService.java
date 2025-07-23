@@ -13,8 +13,10 @@ import com.example.iplan.fcm.FcmRequestDTO;
 import com.example.iplan.fcm.FcmRequestService;
 import com.example.iplan.fcm.FcmToken;
 import com.example.iplan.fcm.FcmTokenService;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -37,17 +39,19 @@ public class AccountParentService {
     private final JwtTokenProvider jwtTokenProvider;
     private final FcmRequestService fcmRequestService;
     private final FcmTokenService fcmTokenService;
+    private final AES256Encryptor aes;
 
     /**
      * 부모가 자녀 닉네임을 입력하여 연동 요청을 보냄
      */
-    public ResponseEntity<Map<String, Object>> sendAccountRequest(String childNickname, String parentNickname)
+    public ResponseEntity<Map<String, Object>> sendAccountRequest(String childNickname, String parentNicknameHash, String parentNickname)
             throws ExecutionException, InterruptedException {
 
         Map<String, Object> response = new HashMap<>();
+        String childNicknameHash = DigestUtils.sha256Hex(childNickname);
 
         // 1. 자녀 유저 조회
-        Users childUser = userRepository.findByNickname(childNickname)
+        Users childUser = userRepository.findByHashValueNickName(childNicknameHash)
                 .orElseThrow(() -> new CustomException("해당 닉네임의 자녀를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         // 2. 자녀인지 확인
@@ -66,7 +70,7 @@ public class AccountParentService {
 
         log.info("수락되지 않은 동일한 요청 체크..");
         // 4. 수락되지 않은 동일한 요청이 이미 존재하는지 확인
-        PendingAccountRequest existingRequest = accountRepository.findExistingRequest(childNickname, parentNickname);
+        PendingAccountRequest existingRequest = accountRepository.findExistingRequest(childNicknameHash, parentNicknameHash);
         if (existingRequest != null) {
             response.put("success", false);
             response.put("message", "이미 해당 자녀에게 연동 요청을 보냈습니다. 요청이 승인될 때까지 기다려주세요.");
@@ -75,7 +79,7 @@ public class AccountParentService {
 
         log.info("이미 해당 계정과 연동이 되어있는지 체크..");
         // 5. 이미 해당 계정과 연동이 되어있는지 확인
-        PendingAccountRequest approvedRequest = accountRepository.findApprovedRequest(childNickname, parentNickname);
+        PendingAccountRequest approvedRequest = accountRepository.findApprovedRequest(childNicknameHash, parentNicknameHash);
         if (approvedRequest != null) {
             response.put("success", false);
             response.put("message", "이미 해당 자녀와 연동이 되어있습니다.");
@@ -84,8 +88,8 @@ public class AccountParentService {
 
         // 5. PendingAccountRequest 생성
         PendingAccountRequest request = PendingAccountRequest.builder()
-                .childNickname(childNickname)
-                .parentNickname(parentNickname)
+                .childHashedNickname(childNicknameHash)
+                .parentHashedNickname(parentNicknameHash)
                 .approved(false)
                 .status("pending")
                 .build();
@@ -95,23 +99,24 @@ public class AccountParentService {
         log.info("PendingAccountRequest 저장 완료: {}", request.getId());
 
         // 7. 연동 요청을 보낼 아이의 FcmToken 찾기
-        List<FcmToken> fcmTokens = fcmTokenService.getTokensByUserId(childUser.getNickname());
+        List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(childUser.getNicknameHash()); //아이디 해시값으로 찾기
 
+        log.info("parentNickname = {}", parentNickname);
         try {
             if(!fcmTokens.isEmpty()){
                 // 8. 아이의 존재하는 모든 FcmToken 으로 푸시알림 전송
                 for(FcmToken fcmToken : fcmTokens){
                     log.info("아이의 fcmToken: {}", fcmToken.getToken());
                     FcmRequestDTO requestDTO = FcmRequestDTO.builder()
-                            .user_id(fcmToken.getUser_id())
-                            .fcmToken(fcmToken.getToken())
+                            .user_id(fcmToken.getUser_id()) // 해시된 user_id
+                            .fcmToken(fcmToken.getToken()) // 그냥 아무것도 안된 token
                             .notification(FcmRequestDTO.Notification.builder()
                                     .title("iPlan")
-                                    .body(parentNickname + " 부모님이 연동 요청을 보냈습니다. 눌러서 확인하세요.")
+                                    .body(aes.decrypt(parentNickname) + " 부모님이 연동 요청을 보냈습니다. 눌러서 확인하세요.") // 평문 id
                                     .build())
                             .data(FcmRequestDTO.Data.builder()
                                     .pendingRequestId(request.getId())
-                                    .sender(parentNickname)
+                                    .sender(aes.decrypt(parentNickname)) // 평문 id
                                     .type("AccountLinkRequest")
                                     .build())
                             .build();
@@ -140,7 +145,7 @@ public class AccountParentService {
             PendingAccountRequest pendingRequests = accountRepository.findParentRequest(parentNickname);
 
             if (pendingRequests != null) {
-                String childNickname = pendingRequests.getChildNickname();
+                String childNickname = pendingRequests.getChildHashedNickname();
                 log.info("Child Nickname: {}", childNickname);
                 return ResponseEntity.ok(Map.of(
                         "success", true,
