@@ -27,6 +27,8 @@ public class PlanChildDTO {
     @Schema(description = "사용자 Nickname", example = "user123")
     private String user_id;
 
+    private String hashed_user_id;
+
     @Schema(description = "계획 제목", example = "수학 익힘책 23p 풀기", requiredMode = Schema.RequiredMode.REQUIRED)
     private String title;
 

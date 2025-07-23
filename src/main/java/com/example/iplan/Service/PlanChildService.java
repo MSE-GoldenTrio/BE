@@ -2,12 +2,13 @@ package com.example.iplan.Service;
 
 import com.example.iplan.DTO.PlanChildDTO;
 import com.example.iplan.DTO.ScreenTimeDTO;
-import com.example.iplan.Domain.Alarm;
 import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Domain.ScreenTime;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
+import com.example.iplan.auth.UserRepository;
+import com.example.iplan.auth.Users;
 import com.example.iplan.fcm.FcmToken;
 import com.example.iplan.fcm.FcmTokenService;
 import com.example.iplan.scheduler.PushSchedulerService;
@@ -23,7 +24,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Consumer;
 
 @Slf4j
 @Service
@@ -36,6 +36,7 @@ public class PlanChildService {
     private final PushSchedulerService pushSchedulerService;
     private final AlarmService alarmService;
     private final AES256Encryptor aes;
+    private final UserRepository userRepository;
 
     /**
      * 새로운 계획을 추가하는 기능
@@ -52,8 +53,13 @@ public class PlanChildService {
         String encryptedTitle = aes.encrypt(planPostDto.getTitle());
         String encryptedMemo = aes.encrypt(planPostDto.getMemo());
 
+        Users user = userRepository.findByNickname(user_id).orElseThrow(() -> new IllegalArgumentException("User not found."));
+        String hashedNickname = user.getNicknameHash();
+
+        // 계획 포스트에 해시된 유저 아이디 필드 추가
         PlanChild planPost = PlanChild.builder()
                 .user_id(user_id)
+                .hashed_user_id(hashedNickname)
                 .alarm(planPostDto.isAlarm())
                 .memo(encryptedMemo)
                 .category_id(planPostDto.getCategory_id())
@@ -75,7 +81,7 @@ public class PlanChildService {
             if (planPost.isAlarm() && planPost.getPlan_start_time() != null && !planPost.getPlan_start_time().isBlank()) {
 
                 // 사용자 FCM 토큰 모두 조회
-                List<FcmToken> fcmTokens = fcmTokenService.getTokensByUserId(user_id);
+                List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(hashedNickname);
 
                 if (!fcmTokens.isEmpty()) {
                     for (FcmToken token : fcmTokens) {
@@ -104,7 +110,7 @@ public class PlanChildService {
      * @param planChildDTO 수정된 계획의 DTO
      * @param user_id 해당 계획 소유자 id
      */
-    public ResponseEntity<Map<String, Object>> updateOriginalPlan(PlanChildDTO planChildDTO, String user_id) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updateOriginalPlan(PlanChildDTO planChildDTO, String user_id) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
         PlanChild existingPlan = planChildRepository.findEntityByDocumentId(planChildDTO.getId());
@@ -122,6 +128,7 @@ public class PlanChildService {
         PlanChild updatePlan = PlanChild.builder()
                 .id(existingPlan.getId())
                 .user_id(user_id)
+                .hashed_user_id(existingPlan.getHashed_user_id())
                 .alarm(planChildDTO.isAlarm())
                 .memo(aes.encrypt(planChildDTO.getMemo()))
                 .category_id(planChildDTO.getCategory_id())
@@ -153,7 +160,7 @@ public class PlanChildService {
             log.info("알림 설정 해제로 푸시 예약 및 Alarm 삭제 완료: planId = {}", updatePlan.getId());
         } else if (alarmIsNowOn && hasStartTime) {
             // 알림이 설정되었고 시작시간이 있다면 푸시 예약
-            List<FcmToken> fcmTokens = fcmTokenService.getTokensByUserId(user_id);
+            List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(existingPlan.getHashed_user_id());
 
             if (!fcmTokens.isEmpty()) {
                 for (FcmToken token : fcmTokens) {
@@ -163,7 +170,7 @@ public class PlanChildService {
                     log.info("푸시 알림 예약 및 Alarm 저장 완료: planId = {}, token = {}", updatePlan.getId(), token.getToken());
                 }
             } else {
-                log.warn("계획 수정 중 FCM 토큰이 존재하지 않아 푸시 예약 생략: user_id = {}", user_id);
+                log.warn("계획 수정 중 FCM 토큰이 존재하지 않아 푸시 예약 생략: user_id = {}", aes.decrypt(user_id));
             }
         }
 

@@ -80,6 +80,10 @@ public class JwtTokenProvider {
         log.info("User nickname: {}, email: {}, role: {}, linked_id: {}", nickname, email, role, linked_id);
 
         long now = (new Date()).getTime();
+        List<String> decodedLinkedId = new ArrayList<>();
+        for(String id : linked_id){
+            decodedLinkedId.add(aes.decrypt(id));
+        }
 
         // Access Token 생성
         Date accessTokenExpiresIn = new Date(now + accessTokenExpiration);
@@ -87,7 +91,7 @@ public class JwtTokenProvider {
                 .setSubject(aes.decrypt(nickname))
                 .claim("email", aes.decrypt(email))
                 .claim("role", role.name()) // Enum 값 저장 (CHILD, PARENT)
-                .claim("linked_id", linked_id)  // 리스트로 저장
+                .claim("linked_id", decodedLinkedId)  // 리스트로 저장
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();

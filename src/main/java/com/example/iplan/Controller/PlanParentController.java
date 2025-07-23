@@ -1,12 +1,15 @@
 package com.example.iplan.Controller;
 
 import com.example.iplan.Service.PlanParentService;
+import com.example.iplan.auth.UserRepository;
+import com.example.iplan.auth.Users;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,7 +27,7 @@ import java.util.concurrent.ExecutionException;
 public class PlanParentController {
 
     private final PlanParentService planParentService;
-
+    private final UserRepository userRepository;
     /**
      * 부모의 linked_id를 기반으로 모든 자녀의 전체 계획 목록 반환
      */
@@ -68,9 +71,11 @@ public class PlanParentController {
             return new ResponseEntity<>(Map.of("message", "잘못된 자녀 인덱스입니다."), HttpStatus.BAD_REQUEST);
         }
 
-        String childNickname = linkedIds.get(index);
+        String childNickname = linkedIds.get(index); // 평문 아이 아이디
+        Users childUser = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(childNickname)).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        String encryptedChildNickname = childUser.getNickname();
 
-        Map<String, Object> response = planParentService.getAllPlans(childNickname);
+        Map<String, Object> response = planParentService.getAllPlans(encryptedChildNickname);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 

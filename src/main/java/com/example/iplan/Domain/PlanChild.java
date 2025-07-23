@@ -28,6 +28,9 @@ public class PlanChild {
     private String user_id;
 
     @NotNull
+    private String hashed_user_id;
+
+    @NotNull
     @Schema(description = "계획 제목", example = "수학 익힘책 23p 풀기", requiredMode = Schema.RequiredMode.REQUIRED)
     private String title;
 

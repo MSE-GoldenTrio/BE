@@ -123,7 +123,7 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public List<RewardChildDTO> getAllRewards(String nickname) throws ExecutionException, InterruptedException {
+    public List<RewardChildDTO> getAllRewards(String nickname) throws Exception {
         // 사용자가 존재하는지 확인
         Users user = userRepository.findByNickname(nickname)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -139,12 +139,12 @@ public class RewardChildService {
             if (rewards.isEmpty()) {
                 log.info("{}'s reward is not exist.", nickname);
             } else {
-                log.info("{}'s rewards received successfully!! Size: {}", nickname, rewards.size());
+                log.info("{}(복호화 됨)'s rewards received successfully!! Size: {}", aes.decrypt(nickname), rewards.size());
             }
 
             return rewards;
         } catch (Exception e) {
-            log.error("Error of {}: {}", nickname, e.getMessage());
+            log.error("Error of {}(복호화 됨): {}", aes.decrypt(nickname), e.getMessage());
             throw new ExecutionException("보상 목록을 가져오는 중 오류가 발생했습니다.", e);
         }
     }

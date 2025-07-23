@@ -5,9 +5,9 @@ import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.FeedbackRepository;
 import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.RewardChildRepository;
-import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Service.AlarmService;
 import com.example.iplan.Service.PlanChildService;
+import com.example.iplan.fcm.FcmRequestService;
 import com.example.iplan.fcm.FcmTokenService;
 import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
@@ -34,9 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -60,6 +58,7 @@ public class UserService {
     private final PlanChildService planChildService;
     private final AlarmService alarmService;
     private final PushSchedulerService pushSchedulerService;
+    private final FcmRequestService fcmRequestService;
 
     private final AES256Encryptor aes;
 
@@ -98,10 +97,18 @@ public class UserService {
     }
 
     // 로그인
-    public JwtToken signIn(String nickname, String password, String fcmToken) {
+
+    /**
+     *
+     * @param user_id 헷갈려서 user_id로 해놓음 User테이블의 nickname임
+     * @param password
+     * @param fcmToken
+     * @return
+     */
+    public JwtToken signIn(String user_id, String password, String fcmToken) {
         try {
             // 1. 사용자의 입력값으로 UsernamePasswordAuthenticationToken 생성 -> 비밀번호 검증을 위해 사용됨
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(nickname, password);
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(user_id, password);
             log.info("Passed signIn 1");
 
             // AuthenticationManager 가 로그인 요청을 처리 (여기서 사용자 인증과 비밀번호 검증이 이루어짐)
@@ -119,14 +126,14 @@ public class UserService {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             // 인증된 사용자 조회
-            Users user = userRepository.findByNickname(nickname)
+            Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(user_id))
                     .orElseThrow(() -> new IllegalArgumentException("User not found."));
 
             // 4. fcmToken 디비에 업데이트
-            fcmTokenService.save(nickname, fcmToken);
+            fcmTokenService.save(user.getNicknameHash(), fcmToken); // 암호화된 user_id
 
             // 5. 새 디바이스에 푸시 예약 복구
-            saveFutureAlarm(nickname, fcmToken);
+            saveFutureAlarm(user.getNickname(), fcmToken); // 암호화된 user_id로 해야함
 
             // 6. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
             JwtToken jwtToken = jwtTokenProvider.generateToken(authentication);
@@ -140,7 +147,7 @@ public class UserService {
                     jwtToken.getRefreshToken(),
                     expirationMinutes
             );
-            log.info("Saved refresh token in Redis: nickname={}, ttl={}min", nickname, expirationMinutes);
+            log.info("Saved refresh token in Redis: user_id={}, ttl={}min", user_id, expirationMinutes);
 
             // 8. jwt 반환
             return jwtToken;
@@ -149,16 +156,15 @@ public class UserService {
         }
     }
 
-    public void withdraw(String accessToken, String fcmToken, String userId) throws ExecutionException, InterruptedException {
-        String nickname = jwtTokenProvider.getUserNickname(accessToken);
-        Users user = userRepository.findByNickname(nickname)
+    public void withdraw(String accessToken, String fcmToken, String userId) throws Exception {
+        Users user = userRepository.findByNickname(userId) //암호화된 걸로 찾아야됨
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", HttpStatus.NOT_FOUND));
 
-        log.info("회원 탈퇴 사용자 id: {}", nickname);
+        log.info("회원 탈퇴 사용자 id: {}", aes.decrypt(userId));
 
         // 1. FCM 토큰 삭제
         if (fcmToken != null && !fcmToken.isBlank()) {
-            fcmTokenService.deleteToken(userId, fcmToken);
+            fcmTokenService.deleteToken(user.getNicknameHash(), fcmToken);
         }
 
         // 1. 토큰 무효화
@@ -181,13 +187,13 @@ public class UserService {
         }
 
         // 4. 관련 데이터 삭제 (계획, 보상 등)
-        planChildRepository.deleteAllByUserId(nickname);
-        rewardChildRepository.deleteAllByUserId(nickname);
-        feedbackRepository.deleteAllByUserId(nickname);
+        planChildRepository.deleteAllByUserId(userId);
+        rewardChildRepository.deleteAllByUserId(userId);
+        feedbackRepository.deleteAllByUserId(userId);
         // 5. 사용자 문서 삭제
         userRepository.delete(user);
 
-        log.info("회원 탈퇴 완료: {}", nickname);
+        log.info("회원 탈퇴 완료: {}", aes.decrypt(userId));
     }
 
     public void unlinkSocial(String provider, String providerAccessToken){
@@ -278,6 +284,11 @@ public class UserService {
      * 닉네임을 기반으로 사용자 조회
      */
     public Users findByNickname(String nickname) {
+        Optional<Users> user = userRepository.findByNickname(nickname);
+        return user.orElse(null); // 사용자 없을 경우 null 반환
+    }
+
+    public Users findByHashNickname(String nickname){
         Optional<Users> user = userRepository.findByNickname(nickname);
         return user.orElse(null); // 사용자 없을 경우 null 반환
     }
@@ -402,8 +413,7 @@ public class UserService {
             userRepository.update(user);
 
             // 상대 연동 계정에서 나도 삭제한다.
-            Users linked_user = userRepository.findByNickname(linked_id)
-                    .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다: " + linked_id, HttpStatus.NOT_FOUND));
+            Users linked_user = findByNickname(linked_id);
 
             List<String> linked_user_linked_id = linked_user.getLinked_id();
             linked_user_linked_id.remove(user.getNickname());

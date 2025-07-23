@@ -8,6 +8,7 @@ import com.example.iplan.auth.Users;
 import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -46,11 +47,11 @@ public class RewardParentsService {
         Map<String, Object> response = new HashMap<>();
 
         // 사용자 존재 여부 확인
-        Users user = userRepository.findByNickname(nickname)
+        Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다: " + nickname, HttpStatus.NOT_FOUND));
 
         try {
-            List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(nickname);
+            List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(user.getNickname());
 
             for(RewardChildDTO dto : rewards){
                 dto.setContent(aes.decrypt(dto.getContent()));
@@ -59,12 +60,13 @@ public class RewardParentsService {
             if (rewards == null || rewards.isEmpty()) {
                 response.put("success", false);
                 response.put("message", "등록된 보상이 없습니다.");
+                log.info("Get reward for {} failed!", nickname);
             } else {
                 response.put("success", true);
                 response.put("rewards", rewards);
+                log.info("Get reward for {} successfully!", nickname);
             }
 
-            log.info("Get reward for {} successfully!", nickname);
             return response;
 
         } catch (Exception e) {

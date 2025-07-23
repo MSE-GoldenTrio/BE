@@ -2,6 +2,7 @@ package com.example.iplan.auth;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.security.core.userdetails.UserDetails;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -22,7 +23,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     // UserService 의 로그인 과정에서 호출 됨 -> 디비에서 해당 이메일을 가진 사용자 조회
     @Override
     public UserDetails loadUserByUsername(String nickname) throws UsernameNotFoundException {
-        Users user = userRepository.findByNickname(nickname)
+        Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 
         log.info("Loaded user from DB: {}, {}", user.getNickname(), user.getEmail());

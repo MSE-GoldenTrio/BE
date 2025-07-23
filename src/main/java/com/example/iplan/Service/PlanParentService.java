@@ -2,9 +2,12 @@ package com.example.iplan.Service;
 
 import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Repository.PlanChildRepository;
+import com.example.iplan.auth.UserRepository;
+import com.example.iplan.auth.Users;
 import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -19,6 +22,7 @@ import java.util.concurrent.ExecutionException;
 public class PlanParentService {
 
     private final PlanChildRepository planChildRepository;
+    private final UserRepository userRepository;
     private final AES256Encryptor aes;
 
     /**
@@ -28,7 +32,9 @@ public class PlanParentService {
         Map<String, Object> allPlans = new HashMap<>();
 
         for (String childNickname : childNicknames) {
-            Map<String, Object> childPlans = getAllPlans(childNickname); // 재사용
+            Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(childNickname)).orElseThrow(()-> new IllegalArgumentException("User not found"));
+            String encryptedUserId = user.getNickname();
+            Map<String, Object> childPlans = getAllPlans(encryptedUserId); // 재사용
             allPlans.put(childNickname, childPlans);
         }
 
@@ -47,6 +53,7 @@ public class PlanParentService {
         if (plans == null || plans.isEmpty()) {
             response.put("success", false);
             response.put("message", "등록된 계획이 없습니다.");
+            log.info("Get plan for {} failed!", aes.decrypt(childNickname));
         } else {
             // Firestore의 문서 ID를 PlanChild 객체에 설정
             // 저장된 계획 중 ID가 없는 경우는 비정상 데이터이므로 오류 유도
@@ -60,8 +67,8 @@ public class PlanParentService {
             }
             response.put("success", true);
             response.put("plans", plans);
+            log.info("Get plan for {} successfully!", aes.decrypt(childNickname));
         }
-        log.info("Get plan for {} successfully!", childNickname);
         return response;
     }
 

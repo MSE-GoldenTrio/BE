@@ -133,6 +133,8 @@ public class RewardChildController {
             response.put("success", false);
             response.put("message", "보상 목록을 가져오는 데 실패했습니다. Error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
