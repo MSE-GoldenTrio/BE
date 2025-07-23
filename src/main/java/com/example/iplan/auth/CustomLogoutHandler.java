@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
@@ -23,6 +24,7 @@ public class CustomLogoutHandler implements LogoutHandler, LogoutSuccessHandler 
 
     private final JwtTokenProvider jwtTokenProvider;
     private final FcmTokenService fcmTokenService;
+    private final UserRepository userRepository;
 
     @Override
     public void logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
@@ -35,10 +37,11 @@ public class CustomLogoutHandler implements LogoutHandler, LogoutSuccessHandler 
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
             String userId = jwtTokenProvider.getUserNickname(token);
+            Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(userId)).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
             // FCM 토큰 삭제
             if (fcmToken != null && !fcmToken.isBlank()) {
-                fcmTokenService.deleteToken(userId, fcmToken);
+                fcmTokenService.deleteToken(user.getNicknameHash(), fcmToken);
             }
 
             // 토큰 무효화 처리

@@ -7,7 +7,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Slf4j
@@ -19,26 +18,27 @@ public class FcmTokenService {
 
     /**
      * 사용자 ID와 FCM 토큰을 저장 (중복 토큰은 저장하지 않음)
+     * 닉네임 해시값으로 FcmToken 저장!!!!
      */
-    public void save(String nickname, String token) {
+    public void save(String hashedNickname, String token) {
         try {
             // 1. 이미 존재하는지 확인 (userId + token 조합)
-            FcmToken existingToken = fcmTokenRepository.findByUserIdAndToken(nickname, token);
+            FcmToken existingToken = fcmTokenRepository.findByHashedUserIdAndToken(hashedNickname, token);
 
             if (existingToken != null) {
-                log.info("이미 등록된 FCM 토큰: nickname={}, token={}", nickname, token);
+                log.info("이미 등록된 FCM 토큰: hashedNickname={}, token={}", hashedNickname, token);
                 return;
             }
 
             // 2. 새 FCM 토큰 저장
             FcmToken newToken = FcmToken.builder()
-                    .user_id(nickname)
+                    .user_id(hashedNickname)
                     .token(token)
                     .createdAt(System.currentTimeMillis())
                     .build();
 
             fcmTokenRepository.saveWithAutoIncrement(newToken);
-            log.info("FCM 토큰 저장 완료: userId={}, token={}", nickname, token);
+            log.info("FCM 토큰 저장 완료: userId={}, token={}", hashedNickname, token);
 
         } catch (ExecutionException | InterruptedException e) {
             log.error("FCM 토큰 저장 실패: {}", e.getMessage());
@@ -52,9 +52,9 @@ public class FcmTokenService {
     /**
      * 특정 사용자 ID의 모든 FCM 토큰 조회
      */
-    public List<FcmToken> getTokensByUserId(String userId) {
+    public List<FcmToken> getTokensByHashedUserId(String hashedUserId) {
         try {
-            return fcmTokenRepository.findByUserId(userId);
+            return fcmTokenRepository.findByHashedUserId(hashedUserId);
         } catch (ExecutionException | InterruptedException e) {
             log.error("FCM 토큰 조회 실패", e);
             Thread.currentThread().interrupt();
@@ -65,13 +65,13 @@ public class FcmTokenService {
     /**
      * 로그아웃 등으로 인해 FCM 토큰 제거
      */
-    public void deleteToken(String userId, String token) {
+    public void deleteToken(String hashedUserId, String token) {
         try {
             // 제거할 토큰 검색
-            FcmToken tokenToDelete = fcmTokenRepository.findByUserIdAndToken(userId, token);
+            FcmToken tokenToDelete = fcmTokenRepository.findByHashedUserIdAndToken(hashedUserId, token);
             if (tokenToDelete != null) {
                 fcmTokenRepository.delete(tokenToDelete);
-                log.info("FCM 토큰 삭제 완료: userId={}, token={}", userId, token);
+                log.info("FCM 토큰 삭제 완료: hashedUserId={}, token={}", hashedUserId, token);
             } else {
                 throw new CustomException("삭제할 FCM 토큰이 존재하지 않음: token = " + token, HttpStatus.NOT_FOUND);
             }

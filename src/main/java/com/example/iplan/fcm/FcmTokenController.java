@@ -1,5 +1,7 @@
 package com.example.iplan.fcm;
 
+import com.example.iplan.auth.UserRepository;
+import com.example.iplan.auth.Users;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,7 @@ import java.util.Map;
 public class FcmTokenController {
 
     private final FcmTokenService fcmTokenService;
+    private final UserRepository userRepository;
 
     /**
      * 소셜로그인 이후 발급받은 FcmToken 저장
@@ -26,7 +29,9 @@ public class FcmTokenController {
     @PostMapping("/register-fcm-token")
     public ResponseEntity<?> registerFcmToken(@RequestBody Map<String, String> request, @AuthenticationPrincipal CustomOAuth2UserDetails customOAuth2UserDetails) {
         String fcmToken = request.get("fcmToken");
-        fcmTokenService.save(customOAuth2UserDetails.getUsername(), fcmToken); // 또는 업데이트
+        Users user = userRepository.findByNickname(customOAuth2UserDetails.getUsername()).orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        fcmTokenService.save(user.getNicknameHash(), fcmToken); // 또는 업데이트
         return ResponseEntity.ok().build();
     }
 

@@ -34,7 +34,7 @@ public class AuthController {
     @DeleteMapping("/delete-account")
     public ResponseEntity<?> deleteAccount(@RequestHeader("Authorization") String authHeader,
                                            @RequestHeader("fcm-token") String fcmToken,
-                                           @AuthenticationPrincipal CustomOAuth2UserDetails customOAuth2UserDetails) throws ExecutionException, InterruptedException {
+                                           @AuthenticationPrincipal CustomOAuth2UserDetails customOAuth2UserDetails) throws Exception {
         String accessToken = authHeader.replace("Bearer ", "");
         String userId = customOAuth2UserDetails.getUsername();
         userService.withdraw(accessToken, fcmToken, userId); // 탈퇴 처리 서비스 호출
