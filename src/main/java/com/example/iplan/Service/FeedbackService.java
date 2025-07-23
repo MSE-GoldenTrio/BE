@@ -107,6 +107,8 @@ public class FeedbackService {
                         feedback.setId(UUID.randomUUID().toString()); // ID가 없으면 임시 ID 부여
                         feedback.setComment(aes.decrypt(feedback.getComment()));
                     }
+                    feedback.setUser_id(aes.decrypt(feedback.getUser_id()));
+                    feedback.setChild_id(aes.decrypt(feedback.getChild_id()));
                     feedback.setComment(aes.decrypt(feedback.getComment()));
                     log.info("feedback comment: {}", feedback.getComment());
                 }

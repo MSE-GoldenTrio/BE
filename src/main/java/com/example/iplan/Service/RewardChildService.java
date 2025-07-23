@@ -133,6 +133,7 @@ public class RewardChildService {
             List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(nickname);
 
             for(RewardChildDTO dto : rewards){
+                dto.setUser_id(aes.decrypt(dto.getUser_id()));
                 dto.setContent(aes.decrypt(dto.getContent()));
             }
 

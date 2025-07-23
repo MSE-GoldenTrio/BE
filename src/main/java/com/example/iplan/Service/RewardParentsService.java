@@ -54,6 +54,7 @@ public class RewardParentsService {
             List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(user.getNickname());
 
             for(RewardChildDTO dto : rewards){
+                dto.setUser_id(aes.decrypt(dto.getUser_id()));
                 dto.setContent(aes.decrypt(dto.getContent()));
             }
 

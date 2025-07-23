@@ -229,13 +229,14 @@ public class PlanChildService {
                 if (plan.getId() == null) {
                     plan.setId(UUID.randomUUID().toString()); // ID가 없으면 임시 ID 부여
                 }
+                plan.setUser_id(aes.decrypt(plan.getUser_id()));
                 plan.setTitle(aes.decrypt(plan.getTitle()));
                 plan.setMemo(aes.decrypt(plan.getMemo()));
             }
             response.put("success", true);
             response.put("plans", plans);
         }
-        log.info("Get plan successfully!");
+        log.info("Get plan(child account) successfully!");
         return response;
     }
 

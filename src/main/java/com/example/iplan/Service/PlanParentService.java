@@ -61,7 +61,7 @@ public class PlanParentService {
                 if (plan.getId() == null) {
                     throw new IllegalStateException("계획 ID가 없는 데이터가 존재합니다. DB 무결성을 확인해주세요.");
                 }
-
+                plan.setUser_id(aes.decrypt(plan.getUser_id()));
                 plan.setTitle(aes.decrypt(plan.getTitle()));
                 plan.setMemo(aes.decrypt(plan.getMemo()));
             }
