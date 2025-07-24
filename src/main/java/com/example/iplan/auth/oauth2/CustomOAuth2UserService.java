@@ -104,6 +104,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         .password("")   // 소셜 로그인은 비밀번호 없음
                         .authority(UserRole.UNKNOWN) // UserRole 타입으로 직접 전달, 아직 권한 미지정
                         .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
+                        .firebaseAuthUID("")    // 추가 정보 입력 시에 받아서 저장
                         .provider(provider)
                         .providerAccessToken(providerAccessToken)
                         .build();
