@@ -53,20 +53,16 @@ public class RewardChildController {
     }
 
     /**
-     * 보상 세부사항을 가져옴
-     * @param documentId 보상 ID
-     * @return 보상 객체
-     * @throws ExecutionException
-     * @throws InterruptedException
+     * 사용자의 단일 보상 목록 반환
+     * -> 프론트에서 onSnapshot()으로 데이터 변경 감지 후 바뀐 보상만 가져오는것
      */
-    @Operation(summary = "보상 엔티티 GET", description = "해당 ID의 보상 엔티티를 가져온다.",
-            parameters = {
-                    @Parameter(name = "documentID", description = "해당 보상 문서 Id", example = "xicv3412zz", required = true)
-            })
-    @GetMapping("/{documentId}")
-    public ResponseEntity<RewardChild> getReward(@PathVariable @Parameter(example = "sdfg123") String documentId) throws ExecutionException, InterruptedException {
-        RewardChild reward = rewardChildService.getReward(documentId);
-        return ResponseEntity.ok(reward);
+    @Operation(summary = "onSnapshot()으로 감지한 바뀐 보상 데이터 GET", description = "해당 사용자의 단일 보상 목록을 가져온다.")
+    @GetMapping("/changed")
+    public ResponseEntity<Map<String, Object>> getChangedReward(@AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam("rewardId") String rewardId) throws ExecutionException, InterruptedException {
+        String nickname = user.getUsername();
+        log.info("변경된 보상 ID: {}", rewardId);
+        Map<String, Object> response = rewardChildService.getRewardById(nickname, rewardId);
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     /**
