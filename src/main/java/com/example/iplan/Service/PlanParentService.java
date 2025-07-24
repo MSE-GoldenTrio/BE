@@ -1,15 +1,14 @@
 package com.example.iplan.Service;
 
 import com.example.iplan.Domain.PlanChild;
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.PlanChildRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Slf4j
@@ -58,6 +57,30 @@ public class PlanParentService {
         }
         log.info("Get plan for {} successfully!", childNickname);
         return response;
+    }
+
+    /**
+     * 아이의 단일 계획 반환 -> onSnapshot() 감지로 인한 해당 계획의 데이터 반환
+     */
+    public Map<String, Object> getPlanById(String childNickname, String planId) throws ExecutionException, InterruptedException {
+        // planId에 해당하는 계획 가져오기
+        PlanChild plan = planChildRepository.findPlanByID(planId);
+
+        try {
+            if (plan != null) {
+                // 계획의 user_id와 일치한지 확인
+                if (!Objects.equals(plan.getUser_id(), childNickname)) {
+                    throw new CustomException("해당 계획에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
+                }
+                return Map.of("success", true, "message", planId + " 계획 반환 성공", "plan", plan);
+            } else {
+                throw new CustomException(planId + " ID의 계획이 존재하지 않음", HttpStatus.NOT_FOUND);
+            }
+        } catch (Exception e) {
+            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+
     }
 
 }
