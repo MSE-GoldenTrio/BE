@@ -19,6 +19,9 @@ import com.google.api.client.util.Value;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.UserRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
@@ -67,9 +70,10 @@ public class UserService {
                 throw new IllegalArgumentException("Nickname already exists.");
             }
 
-            UserRole role = UserRole.fromString(roleStr);   // Enum 변환
+            // 2. authority Enum 변환
+            UserRole role = UserRole.fromString(roleStr);
 
-            // 2. Users 객체 생성
+            // 3. Users 객체 생성
             Users user = Users.builder()
                     .nickname(nickname)
                     .email(email)
@@ -77,10 +81,12 @@ public class UserService {
                     .name(name)
                     .authority(role)    // child, parent
                     .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
+                    .firebaseAuthUID("")
                     .build();
 
-            // 3. 사용자 정보 User 컬렉션에 저장 -> 자동 증가된 ID로 저장
+            // 4. 사용자 정보 User 컬렉션에 저장 -> 자동 증가된 ID로 저장
             userRepository.saveWithAutoIncrement(user);
+            log.info("회원가입 성공");
 
             return "Sign Up Successfully";
         } catch (ExecutionException | InterruptedException e) {
@@ -109,23 +115,53 @@ public class UserService {
             // 3. 사용자 인증 이후 Authentication 객체를 SecurityContextHolder 에 저장
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // 인증된 사용자 조회
+            // 4. 사용자 정보 조회
             Users user = userRepository.findByNickname(nickname)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found."));
+                    .orElseThrow(() -> new CustomException("사용자 없음", HttpStatus.NOT_FOUND));
 
-            // 4. fcmToken 디비에 업데이트
+            // 5. Firebase 사용자 생성 및 UID 저장
+            if (user.getFirebaseAuthUID() == null || user.getFirebaseAuthUID().isBlank()) {
+                UserRecord userRecord;
+                try {
+                    try {
+                        // 이메일로 이미 존재하는지 확인
+                        userRecord = FirebaseAuth.getInstance().getUserByEmail(user.getEmail());
+                        log.info("기존 Firebase Authentication 사용자: {}", userRecord.getUid());
+                    } catch (Exception e) {
+                        // 존재하지 않으면 새로 생성 (UID 자등오르 랜덤 생성됨)
+                        UserRecord.CreateRequest createRequest = new UserRecord.CreateRequest()
+                                .setEmail(user.getEmail())
+                                .setDisplayName(user.getName());
+                        userRecord = FirebaseAuth.getInstance().createUser(createRequest);
+                        log.info("새 Firebase Authentication 사용자 생성됨: {}", userRecord.getUid());
+
+                        // Users 업데이트
+                        user.setFirebaseAuthUID(userRecord.getUid());
+                        userRepository.update(user);
+                    }
+                } catch (Exception e) {
+                    log.error("Firebase 사용자 생성 중 오류", e);
+                    throw new CustomException("Firebase 사용자 등록 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
+
+            // 6. UID 포함한 사용자 정보로 Authentication 객체 다시 생성
+            CustomOAuth2UserDetails updatedUserDetails = new CustomOAuth2UserDetails(user);
+            Authentication updatedAuth = new UsernamePasswordAuthenticationToken(updatedUserDetails, null, updatedUserDetails.getAuthorities());
+            SecurityContextHolder.getContext().setAuthentication(updatedAuth);
+
+            // 7. fcmToken 디비에 업데이트
             fcmTokenService.save(nickname, fcmToken);
 
-            // 5. 새 디바이스에 푸시 예약 복구
+            // 8. 새 디바이스에 푸시 예약 복구
             saveFutureAlarm(nickname, fcmToken);
 
-            // 6. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
-            JwtToken jwtToken = jwtTokenProvider.generateToken(authentication);
+            // 9. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
+            JwtToken jwtToken = jwtTokenProvider.generateToken(updatedAuth);
             log.info("JwtToken created: accessToken = {}, refreshToken = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
 
-            // 7. Refresh 토큰 Redis 에 저장
+            // 10. Refresh 토큰 Redis 에 저장
             long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
-
             refreshTokenService.saveToken(
                     (CustomOAuth2UserDetails) authentication.getPrincipal(),
                     jwtToken.getRefreshToken(),
@@ -133,14 +169,14 @@ public class UserService {
             );
             log.info("Saved refresh token in Redis: nickname={}, ttl={}min", nickname, expirationMinutes);
 
-            // 8. jwt 반환
+            // 11. jwt 반환
             return jwtToken;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
     }
 
-    public void withdraw(String accessToken, String fcmToken, String userId) throws ExecutionException, InterruptedException {
+    public String withdraw(String accessToken, String fcmToken, String userId, String uid) throws ExecutionException, InterruptedException {
         String nickname = jwtTokenProvider.getUserNickname(accessToken);
         Users user = userRepository.findByNickname(nickname)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", HttpStatus.NOT_FOUND));
@@ -171,14 +207,25 @@ public class UserService {
             user.setProviderAccessToken(null); // 토큰 사용 후 파기
         }
 
-        // 4. 관련 데이터 삭제 (계획, 보상 등)
+        // 4. 관련 데이터 삭제 (계획, 보상, 피드백)
         planChildRepository.deleteAllByUserId(nickname);
         rewardChildRepository.deleteAllByUserId(nickname);
         feedbackRepository.deleteAllByUserId(nickname);
-        // 5. 사용자 문서 삭제
+
+        // 5. 유저 삭제
         userRepository.delete(user);
 
+        // 6. Firebase Authentication 사용자 삭제
+        try {
+            FirebaseAuth.getInstance().deleteUser(uid);
+            log.info("Firebase 사용자 삭제 완료: {}", uid);
+        } catch (FirebaseAuthException e) {
+            log.error("Firebase 사용자 삭제 실패: {}", e.getMessage());
+            throw new CustomException("Firebase 사용자 삭제 실패", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
         log.info("회원 탈퇴 완료: {}", nickname);
+        return "Delete User Successfully";
     }
 
     public void unlinkSocial(String provider, String providerAccessToken){
@@ -295,7 +342,7 @@ public class UserService {
     }
 
     /**
-     * 소셜 로그인 성공 이후 추가 정보(역할) 업데이트
+     * 소셜 로그인 성공 이후 추가 정보(역할과 uid) 업데이트
      */
     public void updateUserRole(String nickname, String roleStr) {
         try {
@@ -303,12 +350,13 @@ public class UserService {
             Users user = userRepository.findByNickname(nickname)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-            // 문자열을 UserRole Enum으로 변환
+            // 문자열을 UserRole Enum 으로 변환
             UserRole role = UserRole.fromString(roleStr);
-            user.setAuthority(role); // ✅ 역할 업데이트
-
+            // 역할 업데이트
+            user.setAuthority(role);
             userRepository.update(user);
             log.info("Updated successfully: {}, {}", nickname, role);
+
         } catch (ExecutionException e) {
             log.error("Firestore ExecutionException Error.. {}", e.getMessage());
             throw new RuntimeException("Firestore 데이터 처리 중 오류 발생", e);

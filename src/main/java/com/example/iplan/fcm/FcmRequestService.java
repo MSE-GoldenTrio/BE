@@ -40,7 +40,11 @@ public class FcmRequestService {
         // 메시지 빌드
         Message message = Message.builder()
                 .setToken(requestDTO.getFcmToken())
-                .setNotification(notification)
+                .setAndroidConfig(AndroidConfig.builder()
+                        .setPriority(AndroidConfig.Priority.HIGH) // 우선 순위를 HIGH로 설정
+                        .build())
+                .putData("title", requestDTO.getNotification().getTitle())
+                .putData("body", requestDTO.getNotification().getBody())
                 .putData("pendingRequestId", pendingRequestId)
                 .putData("sender", sender)
                 .putData("type", type)

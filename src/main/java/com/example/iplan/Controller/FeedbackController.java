@@ -7,6 +7,7 @@ import com.example.iplan.Domain.RewardParents;
 import com.example.iplan.Service.FeedbackService;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.google.firebase.database.annotations.NotNull;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -45,6 +46,23 @@ public class FeedbackController {
         return feedbackService.updateFeedback(feedbackDTO, parentNickname);
     }
 
+    // 부모의 linked_id를 기반으로 모든 자녀의 전체 피드백 목록 반환
+    @Operation(summary = "부모의 자녀 전체 피드백 목록 조회 GET", description = "해당 부모와 연동된 모든 자녀의 피드백 목록을 가져온다.")
+    @GetMapping("/parent/feedback/list")
+    public ResponseEntity<Map<String, Object>> getAllFeedbackList(
+            @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+
+        String parentNickname = user.getUsername();
+        List<String> linkedIds = user.getUser().getLinked_id();
+
+        // 예외 처리: 연동된 자녀가 없는 경우
+        if (linkedIds == null || linkedIds.isEmpty()) {
+            return new ResponseEntity<>(Map.of("success", false, "message", "연동된 자녀가 없습니다."), HttpStatus.BAD_REQUEST);
+        }
+
+        return feedbackService.getAllFeedbacks(parentNickname);
+    }
+
     // 부모가 해당하는 아이에 대한 모든 피드백 가져옴 (child, parent 요청 모두 가능)
     @GetMapping("/feedback/list/{childNickname}")
     public ResponseEntity<Map<String, Object>> getFeedbackParents(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String childNickname)
@@ -69,7 +87,18 @@ public class FeedbackController {
             parentNickname = user.getUsername();
         }
         log.info("부모 아이디: {}", parentNickname);
-        Map<String, Object> response = feedbackService.getFeedbackParents(childNickname, parentNickname);
+        Map<String, Object> response = feedbackService.getOneChildFeedback(childNickname, parentNickname);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    // 단일 피드백 목록 반환 -> 프론트에서 onSnapshot()으로 데이터 변경 감지 후 바뀐 피드백만 가져오는것
+    // 아이가 요청하는 경우만 해당
+    @Operation(summary = "onSnapshot()으로 감지한 바뀐 피드백 데이터 GET", description = "단일 피드백 목록을 가져온다.")
+    @GetMapping("/feedback/changed")
+    public ResponseEntity<Map<String, Object>> getChangedFeedback(@AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam("feedbackId") String feedbackId) throws ExecutionException, InterruptedException {
+        String childNickname = user.getUsername();
+        log.info("변경된 피드백 ID: {}", feedbackId);
+        Map<String, Object> response = feedbackService.getFeedbackById(childNickname, feedbackId);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 

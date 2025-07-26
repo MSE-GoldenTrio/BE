@@ -32,13 +32,14 @@ public class AuthController {
     private final UserService userService;
 
     @DeleteMapping("/delete-account")
-    public ResponseEntity<?> deleteAccount(@RequestHeader("Authorization") String authHeader,
+    public ResponseEntity<String> deleteAccount(@RequestHeader("Authorization") String authHeader,
                                            @RequestHeader("fcm-token") String fcmToken,
                                            @AuthenticationPrincipal CustomOAuth2UserDetails customOAuth2UserDetails) throws ExecutionException, InterruptedException {
         String accessToken = authHeader.replace("Bearer ", "");
         String userId = customOAuth2UserDetails.getUsername();
-        userService.withdraw(accessToken, fcmToken, userId); // 탈퇴 처리 서비스 호출
-        return ResponseEntity.ok(Map.of("message", "회원 탈퇴가 완료되었습니다."));
+        String uid = customOAuth2UserDetails.getFirebaseAuthUID();
+        String result = userService.withdraw(accessToken, fcmToken, userId, uid); // 탈퇴 처리 서비스 호출
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/auth/refresh")
