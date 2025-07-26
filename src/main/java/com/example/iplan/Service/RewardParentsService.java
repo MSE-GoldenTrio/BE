@@ -85,13 +85,17 @@ public class RewardParentsService {
     public Map<String, Object> getRewardById(String childNickname, String rewardId) throws ExecutionException, InterruptedException {
         // planId에 해당하는 계획 가져오기
         RewardChild reward = rewardChildRepository.findRewardByID(rewardId);
+        Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(childNickname)).orElseThrow();
 
         try {
             if (reward != null) {
                 // 보상의 user_id와 인증객체 유저와 일치한지 확인
-                if (!Objects.equals(reward.getUser_id(), childNickname)) {
+                if (!Objects.equals(reward.getUser_id(), user.getNickname())) {
                     throw new CustomException("해당 보상에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
                 }
+                reward.setUser_id(aes.decrypt(reward.getUser_id()));
+                reward.setContent(aes.decrypt(reward.getContent()));
+
                 return Map.of("success", true, "message", rewardId + " 보상 반환 성공", "reward", reward);
             } else {
                 throw new CustomException(rewardId + " ID의 보상이 존재하지 않음", HttpStatus.NOT_FOUND);

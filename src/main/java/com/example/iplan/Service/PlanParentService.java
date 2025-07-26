@@ -84,6 +84,9 @@ public class PlanParentService {
                 if (!Objects.equals(plan.getUser_id(), childNickname)) {
                     throw new CustomException("해당 계획에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
                 }
+                plan.setTitle(aes.decrypt(plan.getTitle()));
+                plan.setMemo(aes.decrypt(plan.getMemo()));
+                plan.setUser_id(aes.decrypt(plan.getUser_id()));
                 return Map.of("success", true, "message", planId + " 계획 반환 성공", "plan", plan);
             } else {
                 throw new CustomException(planId + " ID의 계획이 존재하지 않음", HttpStatus.NOT_FOUND);

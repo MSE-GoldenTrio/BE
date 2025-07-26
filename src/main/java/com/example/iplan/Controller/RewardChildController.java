@@ -58,7 +58,7 @@ public class RewardChildController {
      */
     @Operation(summary = "onSnapshot()으로 감지한 바뀐 보상 데이터 GET", description = "해당 사용자의 단일 보상 목록을 가져온다.")
     @GetMapping("/changed")
-    public ResponseEntity<Map<String, Object>> getChangedReward(@AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam("rewardId") String rewardId) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> getChangedReward(@AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam("rewardId") String rewardId) throws Exception {
         String nickname = user.getUsername();
         log.info("변경된 보상 ID: {}", rewardId);
         Map<String, Object> response = rewardChildService.getRewardById(nickname, rewardId);

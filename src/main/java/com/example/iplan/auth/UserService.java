@@ -111,7 +111,7 @@ public class UserService {
      * @param fcmToken
      * @return
      */
-    public JwtToken signIn(String nickname, String password, String fcmToken) {
+    public JwtToken signIn(String user_id, String password, String fcmToken) {
         try {
             // 1. 사용자의 입력값으로 UsernamePasswordAuthenticationToken 생성 -> 비밀번호 검증을 위해 사용됨
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(user_id, password);
@@ -132,7 +132,7 @@ public class UserService {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             // 4. 사용자 정보 조회
-            Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
+            Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(user_id))
                     .orElseThrow(() -> new CustomException("사용자 없음", HttpStatus.NOT_FOUND));
 
             // 5. Firebase 사용자 생성 및 UID 저장
@@ -141,13 +141,13 @@ public class UserService {
                 try {
                     try {
                         // 이메일로 이미 존재하는지 확인
-                        userRecord = FirebaseAuth.getInstance().getUserByEmail(user.getEmail());
+                        userRecord = FirebaseAuth.getInstance().getUserByEmail(aes.decrypt(user.getEmail()));
                         log.info("기존 Firebase Authentication 사용자: {}", userRecord.getUid());
                     } catch (Exception e) {
                         // 존재하지 않으면 새로 생성 (UID 자등오르 랜덤 생성됨)
                         UserRecord.CreateRequest createRequest = new UserRecord.CreateRequest()
-                                .setEmail(user.getEmail())
-                                .setDisplayName(user.getName());
+                                .setEmail(aes.decrypt(user.getEmail()))
+                                .setDisplayName(aes.decrypt(user.getName()));
                         userRecord = FirebaseAuth.getInstance().createUser(createRequest);
                         log.info("새 Firebase Authentication 사용자 생성됨: {}", userRecord.getUid());
 
@@ -167,7 +167,7 @@ public class UserService {
             SecurityContextHolder.getContext().setAuthentication(updatedAuth);
 
             // 7. fcmToken 디비에 업데이트
-            fcmTokenService.save(user.getNicknameHash(), fcmToken);
+            fcmTokenService.save(user.getNicknameHash(), fcmToken); // 해시된 user_id로 업데이트
 
             // 5. 새 디바이스에 푸시 예약 복구
             saveFutureAlarm(user.getNickname(), fcmToken); // 암호화된 user_id로 해야함
@@ -192,9 +192,9 @@ public class UserService {
         }
     }
 
-    public String withdraw(String accessToken, String fcmToken, String userId, String uid) throws ExecutionException, InterruptedException {
+    public String withdraw(String accessToken, String fcmToken, String encryptedUserId, String uid) throws ExecutionException, InterruptedException {
         String nickname = jwtTokenProvider.getUserNickname(accessToken);
-        Users user = userRepository.findByNickname(nickname)
+        Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", HttpStatus.NOT_FOUND));
 
         log.info("회원 탈퇴 사용자 id: {}", nickname);
@@ -224,9 +224,9 @@ public class UserService {
         }
 
         // 4. 관련 데이터 삭제 (계획, 보상, 피드백)
-        planChildRepository.deleteAllByUserId(userId);
-        rewardChildRepository.deleteAllByUserId(userId);
-        feedbackRepository.deleteAllByUserId(userId);
+        planChildRepository.deleteAllByUserId(encryptedUserId);
+        rewardChildRepository.deleteAllByUserId(encryptedUserId);
+        feedbackRepository.deleteAllByUserId(encryptedUserId);
 
         // 5. 유저 삭제
         userRepository.delete(user);
@@ -341,8 +341,8 @@ public class UserService {
         return user.orElse(null); // 사용자 없을 경우 null 반환
     }
 
-    public Users findByEmail(String email){
-        Optional<Users> user = userRepository.findByEmail(email);
+    public Users findByEncryptedEmail(String email){
+        Optional<Users> user = userRepository.findByEncryptedEmail(email);
         return user.orElse(null);
     }
 
@@ -453,9 +453,9 @@ public class UserService {
     public void deleteLinkedId(String email, String linked_id){
         try{
             // 사용자의 연동된 계정을 삭제하고
-            Users user = findByEmail(email);
+            Users user = findByEncryptedEmail(email);
 
-            List<String> user_linked_id = user.getLinked_id();
+            List<String> user_linked_id = user.getLinked_id(); // 암호화된 id들
             user_linked_id.remove(linked_id);
             user.setLinked_id(user_linked_id);
 

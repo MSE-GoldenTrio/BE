@@ -69,13 +69,14 @@ public class RewardChildService {
     /**
      * 사용자의 단일 보상 반환 -> onSnapshot() 감지로 인한 해당 보상의 데이터 반환
      */
-    public Map<String, Object> getRewardById(String childNickname, String rewardId) throws ExecutionException, InterruptedException {
+    public Map<String, Object> getRewardById(String childNickname, String rewardId) throws Exception {
         // rewardId에 해당하는 계획 가져오기
         RewardChild reward = rewardChildRepository.findRewardByID(rewardId);
         reward.setContent(aes.decrypt(reward.getContent()));
         try {
             if (reward != null) {
                 // 보상의 user_id와 인증객체 유저와 일치한지 확인
+                log.info("아이쪽 단일 보상 조회 user_id : " + reward.getUser_id() + ", 요청 사용자 아이디: " + childNickname);
                 if (!Objects.equals(reward.getUser_id(), childNickname)) {
                     throw new CustomException("해당 보상에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
                 }
@@ -107,12 +108,12 @@ public class RewardChildService {
             return null;  // 해당 날짜의 보상이 존재하지 않으면 null 반환
         }
 
-        log.info("Daily reward: {}", rewardChild.getContent());
+        log.info("Daily reward: {}", aes.decrypt(rewardChild.getContent()));
 
         // DTO로 변환하여 반환
         return RewardChildDTO.builder()
                 .id(rewardChild.getId())
-                .user_id(rewardChild.getUser_id())
+                .user_id(aes.decrypt(rewardChild.getUser_id()))
                 .content(aes.decrypt(rewardChild.getContent()))
                 .post_date(rewardChild.getPost_date())
                 .post_year(rewardChild.getPost_year())
@@ -145,7 +146,7 @@ public class RewardChildService {
             }
 
             if (rewards.isEmpty()) {
-                log.info("{}'s reward is not exist.", nickname);
+                log.info("{}'s reward is not exist.", aes.decrypt(nickname));
             } else {
                 log.info("{}(복호화 됨)'s rewards received successfully!! Size: {}", aes.decrypt(nickname), rewards.size());
             }

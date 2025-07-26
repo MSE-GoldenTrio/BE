@@ -96,6 +96,11 @@ public class FeedbackService {
                 response.put("message", "피드백 목록이 존재하지 않습니다.");
                 log.info("피드백 목록이 존재하지 않습니다.: {}", parentNickname);
             } else {
+                for(Feedback feedback : feedbacks){
+                    feedback.setChild_id(aes.decrypt(feedback.getChild_id()));
+                    feedback.setComment(aes.decrypt(feedback.getComment()));
+                    feedback.setUser_id(aes.decrypt(feedback.getUser_id()));
+                }
                 response.put("success", true);
                 response.put("feedbacks", feedbacks);
                 log.info("{}'s feedbacks received successfully!! Size: {}", parentNickname, feedbacks.size());
@@ -130,6 +135,8 @@ public class FeedbackService {
                 for (Feedback feedback : feedbacks) {
                     if (feedback.getId() == null) {
                         feedback.setId(UUID.randomUUID().toString()); // ID가 없으면 임시 ID 부여
+                        feedback.setUser_id(aes.decrypt(feedback.getUser_id()));
+                        feedback.setChild_id(aes.decrypt(feedback.getChild_id()));
                         feedback.setComment(aes.decrypt(feedback.getComment()));
                     }
                     feedback.setUser_id(aes.decrypt(feedback.getUser_id()));
@@ -163,6 +170,8 @@ public class FeedbackService {
 
         try {
             // 1. reward_id로 Feedback 에서 해당 객체 찾기
+            Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(feedbackDTO.getChild_id())).orElseThrow();
+            String encryptedChildId = user.getNickname();
             Feedback existingFeedback = feedbackRepository.findByField("reward_id", feedbackDTO.getReward_id());
 
             if (existingFeedback == null) {
@@ -176,7 +185,7 @@ public class FeedbackService {
             Feedback updateFeedback = Feedback.builder()
                     .id(existingFeedback.getId()) // 기존 ID 유지
                     .user_id(existingFeedback.getUser_id())
-                    .child_id(existingFeedback.getChild_id())
+                    .child_id(encryptedChildId)
                     .reward_id(existingFeedback.getReward_id())
                     .comment(feedbackDTO.getComment() != null ? aes.encrypt(feedbackDTO.getComment()) : existingFeedback.getComment())
                     .grade(feedbackDTO.getGrade() != 0 ? feedbackDTO.getGrade() : existingFeedback.getGrade())
@@ -219,6 +228,9 @@ public class FeedbackService {
                 if (!Objects.equals(feedback.getChild_id(), childNickname)) {
                     throw new CustomException("해당 피드백에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
                 }
+                feedback.setUser_id(aes.decrypt(feedback.getUser_id()));
+                feedback.setChild_id(aes.decrypt(feedback.getChild_id()));
+                feedback.setComment(aes.decrypt(feedback.getComment()));
                 return Map.of("success", true, "message", feedbackId + " 피드백 반환 성공", "feedback", feedback);
             } else {
                 throw new CustomException(feedbackId + " ID의 피드백이 존재하지 않음", HttpStatus.NOT_FOUND);

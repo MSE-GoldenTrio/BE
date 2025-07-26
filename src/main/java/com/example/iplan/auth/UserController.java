@@ -8,7 +8,6 @@ import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
-import com.google.firebase.auth.UserRecord;
 import com.google.firebase.auth.FirebaseToken;
 import com.example.iplan.util.AES256Encryptor;
 import io.swagger.v3.oas.annotations.Operation;
@@ -233,7 +232,7 @@ public class UserController {
         String email = payload.get("email");
         Users user = userService.findByHashEmail(email);
 
-        if(user == null) user = userService.findByEmail(email);
+        if(user == null) user = userService.findByEncryptedEmail(email);
 
         System.out.println("Email: " + email);
         System.out.println("User: " + user);
