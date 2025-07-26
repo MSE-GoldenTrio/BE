@@ -22,9 +22,8 @@ public class PlanChild {
     @Schema(description = "계획 데이터 고유 ID", example = "12345")
     private String id; // Firestore 문서의 ID
 
-    //User 테이블의 아이디
     @NotNull
-    @Schema(description = "사용자 UID", example = "user123")
+    @Schema(description = "사용자 닉네임", example = "user123")
     private String user_id;
 
     @NotNull

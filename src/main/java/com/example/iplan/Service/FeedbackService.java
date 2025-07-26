@@ -1,14 +1,12 @@
 package com.example.iplan.Service;
 
-import com.example.iplan.DTO.RewardChildDTO;
 import com.example.iplan.DTO.FeedbackDTO;
 import com.example.iplan.Domain.Feedback;
-import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Domain.RewardChild;
-import com.example.iplan.Domain.RewardParents;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.FeedbackRepository;
 import com.example.iplan.Repository.RewardChildRepository;
+import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.Users;
 import com.example.iplan.util.AES256Encryptor;
@@ -85,9 +83,36 @@ public class FeedbackService {
     }
 
     /**
+     * 부모의 모든 피드백 목록 반환
+     */
+    public ResponseEntity<Map<String, Object>> getAllFeedbacks(String parentNickname) throws ExecutionException, InterruptedException {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // 사용자의 모든 피드백을 가져오기
+            List<Feedback> feedbacks = feedbackRepository.findFeedbackDtoByUserId(parentNickname);
+
+            if (feedbacks.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "피드백 목록이 존재하지 않습니다.");
+                log.info("피드백 목록이 존재하지 않습니다.: {}", parentNickname);
+            } else {
+                response.put("success", true);
+                response.put("feedbacks", feedbacks);
+                log.info("{}'s feedbacks received successfully!! Size: {}", parentNickname, feedbacks.size());
+            }
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error of {}: {}", parentNickname, e.getMessage());
+            throw new ExecutionException("보상 목록을 가져오는 중 오류가 발생했습니다.", e);
+        }
+    }
+
+
+    /**
      * 부모의 해당 아이에 대한 모든 코멘트와 별점을 조회하는 기능
      */
-    public Map<String, Object> getFeedbackParents(String childNickname, String parentNickname) throws ExecutionException, InterruptedException {
+    public Map<String, Object> getOneChildFeedback(String childNickname, String parentNickname) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
 
         Users childUser = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(childNickname)).orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -180,5 +205,28 @@ public class FeedbackService {
             throw new CustomException("수정에 실패했습니다. Error: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    /**
+     * 단일 피드백 반환
+     */
+    public Map<String, Object> getFeedbackById(String childNickname, String feedbackId) throws ExecutionException, InterruptedException {
+        // feedbackId에 해당하는 계획 가져오기
+        Feedback feedback = feedbackRepository.findFeedbackByID(feedbackId);
+
+        try {
+            if (feedback != null) {
+                // 피드백의 user_id와 인증객체 유저와 일치한지 확인
+                if (!Objects.equals(feedback.getChild_id(), childNickname)) {
+                    throw new CustomException("해당 피드백에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
+                }
+                return Map.of("success", true, "message", feedbackId + " 피드백 반환 성공", "feedback", feedback);
+            } else {
+                throw new CustomException(feedbackId + " ID의 피드백이 존재하지 않음", HttpStatus.NOT_FOUND);
+            }
+        } catch (Exception e) {
+            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
 
 }

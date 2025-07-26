@@ -8,6 +8,7 @@ import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.UserRecord;
 import com.google.firebase.auth.FirebaseToken;
 import com.example.iplan.util.AES256Encryptor;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,7 +48,6 @@ public class UserController {
 
             // firebase ID 토큰 검증
             FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-
             if (!decodedToken.isEmailVerified()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("이메일 본인인증이 완료되지 않았습니다.");
             }
@@ -59,10 +59,8 @@ public class UserController {
             String password = signUpDto.getPassword();
             String name = signUpDto.getName();
             String authority = signUpDto.getAuthority();
-            log.info("Register request: nickname = {}, password = {}, name = {}, email = {}, authority: {}", nickname, password, name, verifiedEmail, authority);
 
             String result = userService.signUp(nickname, password, name, verifiedEmail, authority);
-            log.info("Register result: {}", result);
 
             return ResponseEntity.ok(result);
 
@@ -86,6 +84,16 @@ public class UserController {
         return jwtToken;
     }
 
+    @GetMapping("/firebase/custom-token")
+    @Operation(summary = "Firebase Custom Token 생성")
+    public ResponseEntity<Map<String, String>> generateFirebaseToken(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails) throws FirebaseAuthException {
+        String nickname = userDetails.getUsername();
+        Users user = userService.findByNickname(nickname);
+
+        String customToken = FirebaseAuth.getInstance().createCustomToken(user.getFirebaseAuthUID());
+        log.info("Custom Token: {}", customToken);
+        return ResponseEntity.ok(Map.of("customToken", customToken));
+    }
 
     @PostMapping("/auth/check-nickname")
     @Operation(summary = "중복 아이디 체크")
@@ -132,6 +140,7 @@ public class UserController {
         userInfo.put("name", user.getName());
         userInfo.put("authority", user.getAuthority().name());
         userInfo.put("linked_id", user.getLinked_id() != null ? user.getLinked_id() : ""); // null 방지
+        userInfo.put("uid", user.getFirebaseAuthUID() != null ? user.getFirebaseAuthUID() : "");
 
         log.info("Received user info: {}", userInfo);
         return ResponseEntity.ok(userInfo);
@@ -143,47 +152,51 @@ public class UserController {
     @PostMapping("/unknown/update-role")
     public ResponseEntity<Map<String, String>> updateUserRole(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails, @RequestBody Map<String, String> requestBody) throws Exception {
 
-        log.info("Update user role by nickname..");
         String nickname = userDetails.getUsername();
-        if (nickname == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
-        }
 
-        String roleStr = requestBody.get("role"); // 요청에서 역할 가져오기
+        String roleStr = requestBody.get("role");
         if (roleStr == null || (!roleStr.equals("ROLE_CHILD") && !roleStr.equals("ROLE_PARENT"))) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid role"));
+            throw new CustomException("사용자 역할이 존재하지 않습니다.", HttpStatus.BAD_REQUEST);
         }
 
-        userService.updateUserRole(nickname, roleStr); // 사용자 역할 업데이트
+        // 사용자 역할 업데이트
+        userService.updateUserRole(nickname, roleStr);
         log.info("Nickname: {}, Role: {}", nickname, roleStr);
 
-        // SecurityContext에서 올바른 Authentication을 생성하여 JWT를 발급해야함
-        // 따라서 1. DB에서 사용자 객체 조회 2. 정확한 권한을 포함한 Authentication 객체 생성 후 새로운 토큰을 발급
+        // SecurityContext 에서 올바른 Authentication(인증객체)을 생성하여 JWT 를 발급해야함
+        // 따라서 1) DB 에서 사용자 객체 조회 2)정확한 권한을 포함한 Authentication 객체 생성 후 새로운 토큰을 발급
 
-        // 1. 사용자 객체를 다시 조회 (업데이트된 역할 포함)
+        // 1. 사용자 객체를 다시 조회 (업데이트된 정보 포함)
         Users updatedUser = userService.findByNickname(nickname);
         log.info("Updated user info: {}", updatedUser);
-        if (updatedUser == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "User not found"));
-        }
 
-        // 2. CustomOAuth2UserDetails 객체를 생성
-        CustomOAuth2UserDetails newUserDetails = new CustomOAuth2UserDetails(updatedUser);
-
-        // 이 객체를 이용해 UsernamePasswordAuthenticationToken 기반의 Authentication 객체 생성
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-                newUserDetails, null, newUserDetails.getAuthorities()
-        );
+        // 2. 인증객체 생성
+        Authentication authentication = getAuthentication(updatedUser);
 
         // 3. 새로운 JWT 토큰 발급
         JwtToken newToken = jwtTokenProvider.generateToken(authentication);
-        log.info("새로운 JWT 토큰 발급 완료 - AccessToken: {}", newToken.getAccessToken());
+        log.info("새로운 JWT 토큰 발급 완료 - AccessToken: {}, RefreshToken: {}", newToken.getAccessToken(), newToken.getRefreshToken());
 
         // 새로운 JWT 토큰 반환
         return ResponseEntity.ok(Map.of(
                 "message", "Role updated successfully",
-                "accessToken", newToken.getAccessToken()
+                "accessToken", newToken.getAccessToken(),
+                "refreshToken", newToken.getRefreshToken()
         ));
+    }
+
+    private static Authentication getAuthentication(Users updatedUser) {
+        if (updatedUser == null) {
+            throw new CustomException("사용자가 존재하지 않습니다.", HttpStatus.NOT_FOUND);
+        }
+
+        // 추가 정보가 반영된 유저로 CustomOAuth2UserDetails 객체 생성
+        CustomOAuth2UserDetails newUserDetails = new CustomOAuth2UserDetails(updatedUser);
+
+        // 이 객체를 이용해 UsernamePasswordAuthenticationToken 기반의 Authentication 객체 생성
+        return new UsernamePasswordAuthenticationToken(
+                newUserDetails, null, newUserDetails.getAuthorities()
+        );
     }
 
     /**

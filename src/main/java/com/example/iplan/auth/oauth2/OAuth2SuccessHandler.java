@@ -1,13 +1,18 @@
 package com.example.iplan.auth.oauth2;
 
+import com.example.iplan.auth.UserRepository;
+import com.example.iplan.auth.UserService;
 import com.example.iplan.auth.Users;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.UserRecord;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.User;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -26,6 +31,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomOAuth2UserService customOAuth2UserService;
+    private final UserRepository userRepository;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
@@ -38,6 +44,33 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         if (user == null) {
             log.error("OAuth2 login error: No user info");
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "OAuth2 로그인 중 사용자 정보가 없습니다.");
+            return;
+        }
+
+        // Firebase Authentication 사용자 생성 또는 가져오기
+        try {
+            UserRecord userRecord;
+            try {
+                // 이메일로 이미 존재하는지 확인
+                userRecord = FirebaseAuth.getInstance().getUserByEmail(user.getEmail());
+                log.info("기존 Firebase Authentication 사용자: {}", userRecord.getUid());
+            } catch (Exception e) {
+                // 존재하지 않으면 새로 생성 (UID 자등오르 랜덤 생성됨)
+                UserRecord.CreateRequest createRequest = new UserRecord.CreateRequest()
+                        .setEmail(user.getEmail())
+                        .setDisplayName(user.getName());
+
+                userRecord = FirebaseAuth.getInstance().createUser(createRequest);
+                log.info("새 Firebase Authentication 사용자 생성됨: {}", userRecord.getUid());
+            }
+
+            // UID 사용자 정보 업데이트
+            user.setFirebaseAuthUID(userRecord.getUid());
+            userRepository.update(user);
+            log.info("UID 업데이트 성공: {}", userRecord.getUid());
+        } catch (Exception e) {
+            log.error("Firebase 사용자 생성 중 오류", e);
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Firebase 사용자 등록 중 오류 발생");
             return;
         }
 

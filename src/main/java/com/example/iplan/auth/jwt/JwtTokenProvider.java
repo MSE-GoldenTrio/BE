@@ -219,8 +219,8 @@ public class JwtTokenProvider {
     public String generateNewAccessToken(Authentication authentication) throws Exception {
         CustomOAuth2UserDetails userDetails = (CustomOAuth2UserDetails) authentication.getPrincipal();
 
-        String nickname = userDetails.getUser().getNickname();
-        String email = userDetails.getUser().getEmail();
+        String nickname = userDetails.getUsername();
+        String email = userDetails.getEmail();
         List<String> linked_id = userDetails.getUser().getLinked_id();
         UserRole role = userDetails.getUser().getAuthority();
 

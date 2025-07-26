@@ -1,6 +1,7 @@
 package com.example.iplan.Service;
 
 import com.example.iplan.DTO.RewardChildDTO;
+import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Domain.RewardChild;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.RewardChildRepository;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 @Slf4j
@@ -65,19 +67,24 @@ public class RewardChildService {
     }
 
     /**
-     * 보상을 ID로 조회하는 기능
-     * @param id 검색할 보상의 ID
-     * @return 검색된 보상 객체
-     * @throws ExecutionException
-     * @throws InterruptedException
+     * 사용자의 단일 보상 반환 -> onSnapshot() 감지로 인한 해당 보상의 데이터 반환
      */
-    public RewardChild getReward(String id) throws ExecutionException {
+    public Map<String, Object> getRewardById(String childNickname, String rewardId) throws ExecutionException, InterruptedException {
+        // rewardId에 해당하는 계획 가져오기
+        RewardChild reward = rewardChildRepository.findRewardByID(rewardId);
+        reward.setContent(aes.decrypt(reward.getContent()));
         try {
-            RewardChild targetReward = rewardChildRepository.findEntityByDocumentId(id);
-            targetReward.setContent(aes.decrypt(targetReward.getContent()));
-            return targetReward;
+            if (reward != null) {
+                // 보상의 user_id와 인증객체 유저와 일치한지 확인
+                if (!Objects.equals(reward.getUser_id(), childNickname)) {
+                    throw new CustomException("해당 보상에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
+                }
+                return Map.of("success", true, "message", rewardId + " 보상 반환 성공", "reward", reward);
+            } else {
+                throw new CustomException(rewardId + " ID의 보상이 존재하지 않음", HttpStatus.NOT_FOUND);
+            }
         } catch (Exception e) {
-            throw new ExecutionException("보상 조회에 실패했습니다. Error: " + e, e);
+            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
