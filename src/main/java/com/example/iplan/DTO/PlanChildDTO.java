@@ -2,6 +2,7 @@ package com.example.iplan.DTO;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.firebase.database.annotations.NotNull;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -59,5 +60,6 @@ public class PlanChildDTO {
     private String plan_end_time;
 
     @Schema(description = "계획 달성 여부", example = "false", requiredMode = Schema.RequiredMode.REQUIRED)
+    @JsonProperty("is_completed")
     private boolean is_completed;
 }
