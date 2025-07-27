@@ -75,7 +75,12 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         }
 
         // JWT 발급
-        JwtToken jwtToken = jwtTokenProvider.generateToken(authentication);
+        JwtToken jwtToken = null;
+        try {
+            jwtToken = jwtTokenProvider.generateToken(authentication);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         log.info("OAuth2 Access Token: {}", jwtToken.getAccessToken());
         log.info("OAuth2 Refresh Token: {}", jwtToken.getRefreshToken());
 

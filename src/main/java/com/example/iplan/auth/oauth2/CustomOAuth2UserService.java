@@ -5,9 +5,11 @@ import com.example.iplan.auth.UserRole;
 import com.example.iplan.auth.Users;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -29,6 +31,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AES256Encryptor aes;
 
     @Getter
     private Users user;  // 현재 로그인한 사용자 정보 저장
@@ -74,8 +77,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
      */
     private void saveOrUpdate(OAuth2UserInfo oAuth2UserInfo, String provider, String providerAccessToken) {
         try {
-            // 이메일로 사용자 조회
-            Optional<Users> existingUser = userRepository.findByEmail(oAuth2UserInfo.getEmail());
+            Optional<Users> existingUser = userRepository.findByHashValueEmail(DigestUtils.sha256Hex(oAuth2UserInfo.getEmail()));
             if (existingUser.isPresent()) {
                 // 1. 기존 회원이 로그인하는 경우
                 user = existingUser.get();
@@ -98,13 +100,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 }
                 String randomNickname = "user_" + UUID.randomUUID().toString().substring(0, 6);
                 user = Users.builder()
-                        .email(oAuth2UserInfo.getEmail())
+                        .email(aes.encrypt(oAuth2UserInfo.getEmail()))
+                        .emailHash(DigestUtils.sha256Hex(oAuth2UserInfo.getEmail()))
+                        .nickname(aes.encrypt(randomNickname))  // 암호화 저장, 랜덤 닉네임 할당
+                        .nicknameHash(DigestUtils.sha256Hex(randomNickname)) // 중복 방지용
                         .name(oAuth2UserInfo.getName())
-                        .nickname(randomNickname) // 랜덤 닉네임 할당
-                        .password("")   // 소셜 로그인은 비밀번호 없음
-                        .authority(UserRole.UNKNOWN) // UserRole 타입으로 직접 전달, 아직 권한 미지정
-                        .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
-                        .firebaseAuthUID("")    // OAuth2SuccessHandler 에서 저장
+                        .password("")
+                        .authority(UserRole.UNKNOWN)
+                        .linked_id(new ArrayList<>())
+                        .firebaseAuthUID("") // OAuth2SuccessHandler 에서 저장
                         .provider(provider)
                         .providerAccessToken(providerAccessToken)
                         .build();
@@ -113,7 +117,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 isNewUser = true; // 신규 회원
                 log.info("신규 소셜 사용자 등록: {}", user.getEmail());
             }
-        } catch (ExecutionException | InterruptedException e) {
+        } catch (Exception e) {
             log.error("Firestore error: ", e);
             throw new RuntimeException("서버 오류로 인해 로그인에 실패했습니다.");
         }
@@ -122,7 +126,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     /**
      * 사용자 정보를 기반으로 JWT 토큰을 생성
      */
-    private JwtToken generateJwtToken(Users user) {
+    private JwtToken generateJwtToken(Users user) throws Exception {
         CustomOAuth2UserDetails customUserDetails = new CustomOAuth2UserDetails(user);
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(

@@ -25,13 +25,17 @@ public class FirebaseConfig {
      */
     @Bean
     public FirebaseApp firebaseApp() throws IOException {
-        FileInputStream serviceAccount = new FileInputStream(firebaseConfigPath);
+        if (FirebaseApp.getApps().isEmpty()) {
+            FileInputStream serviceAccount = new FileInputStream(firebaseConfigPath);
 
-        FirebaseOptions options = FirebaseOptions.builder()
-                .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                .build();
+            FirebaseOptions options = FirebaseOptions.builder()
+                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                    .build();
 
-        return FirebaseApp.initializeApp(options);
+            return FirebaseApp.initializeApp(options);
+        }else{
+            return FirebaseApp.getInstance();
+        }
     }
 
     /**
@@ -56,6 +60,14 @@ public class FirebaseConfig {
      */
     @Bean
     public Firestore firestore() throws IOException {
-        return FirestoreClient.getFirestore(firebaseApp());
+        try {
+            Firestore firestore = FirestoreClient.getFirestore(firebaseApp());
+            // 간단한 API 호출로 살아있는지 확인
+            firestore.listCollections();
+            return firestore;
+        } catch (IllegalStateException e) {
+            System.out.println("Firestore 인스턴스가 닫혔습니다. 다시 생성합니다.");
+            return FirestoreClient.getFirestore(firebaseApp());
+        }
     }
 }

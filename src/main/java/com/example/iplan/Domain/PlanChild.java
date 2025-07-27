@@ -1,6 +1,7 @@
 package com.example.iplan.Domain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.cloud.firestore.annotation.DocumentId;
 import com.google.firebase.database.annotations.NotNull;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,6 +26,9 @@ public class PlanChild {
     @NotNull
     @Schema(description = "사용자 닉네임", example = "user123")
     private String user_id;
+
+    @NotNull
+    private String hashed_user_id;
 
     @NotNull
     @Schema(description = "계획 제목", example = "수학 익힘책 23p 풀기", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -61,6 +65,7 @@ public class PlanChild {
     private String memo;
 
     @Schema(description = "계획 달성 여부", example = "false", requiredMode = Schema.RequiredMode.REQUIRED)
+    @JsonProperty("is_completed")
     private boolean is_completed;
 
 }

@@ -49,7 +49,7 @@ public class PlanChildController {
     })
     @PostMapping("/addition")
     public ResponseEntity<Map<String, Object>> additionPlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal CustomOAuth2UserDetails user)
-            throws ExecutionException, InterruptedException {
+            throws Exception {
         System.out.println("Child plan addition API received!");
 
         String childNickname = user.getUsername();
@@ -65,7 +65,7 @@ public class PlanChildController {
      */
     @Operation(summary = "계획 목록 조회 GET", description = "해당 사용자의 전체 계획 목록을 가져온다.")
     @GetMapping("/list")
-    public ResponseEntity<Map<String, Object>> getPlanList(@AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> getPlanList(@AuthenticationPrincipal CustomOAuth2UserDetails user) throws Exception {
         String nickname = user.getUsername();
         Map<String, Object> response = planChildService.getAllPlans(nickname);
         return new ResponseEntity<>(response, HttpStatus.OK);
@@ -84,7 +84,7 @@ public class PlanChildController {
             })
     @GetMapping("/detail/{documentID}")
     public ResponseEntity<Map<String, Object>> showPlanDetail
-    (@PathVariable @Parameter(description = "해당 PlanChlid의 Id", example = "xicv3412zz") String documentID) throws ExecutionException, InterruptedException {
+    (@PathVariable @Parameter(description = "해당 PlanChlid의 Id", example = "xicv3412zz") String documentID) throws Exception {
         Map<String, Object> response = new HashMap<>();
         PlanChild planChild = planChildRepository.findPlanByID(documentID);
         response.put("success", true);
@@ -103,7 +103,7 @@ public class PlanChildController {
      */
     @Operation(summary = "단일 계획 업데이트 UPDATE", description = "특정 계획 데이터 값을 바꾼다.(계획 달성 체크의 경우도 해당), Id 필수")
     @PatchMapping("/update-plan")
-    public ResponseEntity<Map<String, Object>> updatePlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updatePlan(@RequestBody @NotNull PlanChildDTO request, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws Exception {
         String childNickname = user.getUsername();
         return planChildService.updateOriginalPlan(request, childNickname);
     }

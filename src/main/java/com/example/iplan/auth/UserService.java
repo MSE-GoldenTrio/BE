@@ -5,15 +5,16 @@ import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.FeedbackRepository;
 import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.RewardChildRepository;
-import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Service.AlarmService;
 import com.example.iplan.Service.PlanChildService;
+import com.example.iplan.fcm.FcmRequestService;
 import com.example.iplan.fcm.FcmTokenService;
 import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.RefreshTokenService;
+import com.example.iplan.util.AES256Encryptor;
 import com.example.iplan.scheduler.PushSchedulerService;
 import com.google.api.client.util.Value;
 import com.google.cloud.firestore.DocumentSnapshot;
@@ -24,6 +25,7 @@ import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
@@ -35,9 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -61,24 +61,30 @@ public class UserService {
     private final PlanChildService planChildService;
     private final AlarmService alarmService;
     private final PushSchedulerService pushSchedulerService;
+    private final FcmRequestService fcmRequestService;
+
+    private final AES256Encryptor aes;
 
     // 회원가입
     public String signUp(String nickname, String password, String name, String email, String roleStr) {
         try {
             // 1. 아이디 중복 확인
-            if (nickname != null && userRepository.findByNickname(nickname).isPresent()) {
-                throw new IllegalArgumentException("Nickname already exists.");
+            if (nickname != null && userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname)).isPresent()) {
+                throw new CustomException("Nickname already exists.", HttpStatus.NOT_FOUND);
             }
 
             // 2. authority Enum 변환
             UserRole role = UserRole.fromString(roleStr);
 
+            assert nickname != null;
             // 3. Users 객체 생성
             Users user = Users.builder()
-                    .nickname(nickname)
-                    .email(email)
+                    .nickname(aes.encrypt(nickname))
+                    .nicknameHash(DigestUtils.sha256Hex(nickname)) // 중복 비교용 해시 추가
+                    .email(aes.encrypt(email))
+                    .emailHash(DigestUtils.sha256Hex(email))
                     .password(passwordEncoder.encode(password)) // 비밀번호 암호화
-                    .name(name)
+                    .name(aes.encrypt(name))
                     .authority(role)    // child, parent
                     .linked_id(new ArrayList<>()) // 빈 리스트로 초기화
                     .firebaseAuthUID("")
@@ -90,15 +96,25 @@ public class UserService {
 
             return "Sign Up Successfully";
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Error accessing Firestore", e);
+            throw new CustomException("Error accessing Firestore: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     // 로그인
-    public JwtToken signIn(String nickname, String password, String fcmToken) {
+
+    /**
+     *
+     * @param user_id 헷갈려서 user_id로 해놓음 User테이블의 nickname임
+     * @param password
+     * @param fcmToken
+     * @return
+     */
+    public JwtToken signIn(String user_id, String password, String fcmToken) {
         try {
             // 1. 사용자의 입력값으로 UsernamePasswordAuthenticationToken 생성 -> 비밀번호 검증을 위해 사용됨
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(nickname, password);
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(user_id, password);
             log.info("Passed signIn 1");
 
             // AuthenticationManager 가 로그인 요청을 처리 (여기서 사용자 인증과 비밀번호 검증이 이루어짐)
@@ -116,7 +132,7 @@ public class UserService {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             // 4. 사용자 정보 조회
-            Users user = userRepository.findByNickname(nickname)
+            Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(user_id))
                     .orElseThrow(() -> new CustomException("사용자 없음", HttpStatus.NOT_FOUND));
 
             // 5. Firebase 사용자 생성 및 UID 저장
@@ -125,13 +141,13 @@ public class UserService {
                 try {
                     try {
                         // 이메일로 이미 존재하는지 확인
-                        userRecord = FirebaseAuth.getInstance().getUserByEmail(user.getEmail());
+                        userRecord = FirebaseAuth.getInstance().getUserByEmail(aes.decrypt(user.getEmail()));
                         log.info("기존 Firebase Authentication 사용자: {}", userRecord.getUid());
                     } catch (Exception e) {
                         // 존재하지 않으면 새로 생성 (UID 자등오르 랜덤 생성됨)
                         UserRecord.CreateRequest createRequest = new UserRecord.CreateRequest()
-                                .setEmail(user.getEmail())
-                                .setDisplayName(user.getName());
+                                .setEmail(aes.decrypt(user.getEmail()))
+                                .setDisplayName(aes.decrypt(user.getName()));
                         userRecord = FirebaseAuth.getInstance().createUser(createRequest);
                         log.info("새 Firebase Authentication 사용자 생성됨: {}", userRecord.getUid());
 
@@ -151,10 +167,10 @@ public class UserService {
             SecurityContextHolder.getContext().setAuthentication(updatedAuth);
 
             // 7. fcmToken 디비에 업데이트
-            fcmTokenService.save(nickname, fcmToken);
+            fcmTokenService.save(user.getNicknameHash(), fcmToken); // 해시된 user_id로 업데이트
 
-            // 8. 새 디바이스에 푸시 예약 복구
-            saveFutureAlarm(nickname, fcmToken);
+            // 5. 새 디바이스에 푸시 예약 복구
+            saveFutureAlarm(user.getNickname(), fcmToken); // 암호화된 user_id로 해야함
 
             // 9. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
             JwtToken jwtToken = jwtTokenProvider.generateToken(updatedAuth);
@@ -167,7 +183,7 @@ public class UserService {
                     jwtToken.getRefreshToken(),
                     expirationMinutes
             );
-            log.info("Saved refresh token in Redis: nickname={}, ttl={}min", nickname, expirationMinutes);
+            log.info("Saved refresh token in Redis: user_id={}, ttl={}min", user_id, expirationMinutes);
 
             // 11. jwt 반환
             return jwtToken;
@@ -176,16 +192,16 @@ public class UserService {
         }
     }
 
-    public String withdraw(String accessToken, String fcmToken, String userId, String uid) throws ExecutionException, InterruptedException {
+    public String withdraw(String accessToken, String fcmToken, String encryptedUserId, String uid) throws ExecutionException, InterruptedException {
         String nickname = jwtTokenProvider.getUserNickname(accessToken);
-        Users user = userRepository.findByNickname(nickname)
+        Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", HttpStatus.NOT_FOUND));
 
         log.info("회원 탈퇴 사용자 id: {}", nickname);
 
         // 1. FCM 토큰 삭제
         if (fcmToken != null && !fcmToken.isBlank()) {
-            fcmTokenService.deleteToken(userId, fcmToken);
+            fcmTokenService.deleteToken(user.getNicknameHash(), fcmToken);
         }
 
         // 1. 토큰 무효화
@@ -208,9 +224,9 @@ public class UserService {
         }
 
         // 4. 관련 데이터 삭제 (계획, 보상, 피드백)
-        planChildRepository.deleteAllByUserId(nickname);
-        rewardChildRepository.deleteAllByUserId(nickname);
-        feedbackRepository.deleteAllByUserId(nickname);
+        planChildRepository.deleteAllByUserId(encryptedUserId);
+        rewardChildRepository.deleteAllByUserId(encryptedUserId);
+        feedbackRepository.deleteAllByUserId(encryptedUserId);
 
         // 5. 유저 삭제
         userRepository.delete(user);
@@ -320,8 +336,18 @@ public class UserService {
         return user.orElse(null); // 사용자 없을 경우 null 반환
     }
 
-    public Users findByEmail(String email){
-        Optional<Users> user = userRepository.findByEmail(email);
+    public Users findByHashNickname(String nickname){
+        Optional<Users> user = userRepository.findByNickname(nickname);
+        return user.orElse(null); // 사용자 없을 경우 null 반환
+    }
+
+    public Users findByEncryptedEmail(String email){
+        Optional<Users> user = userRepository.findByEncryptedEmail(email);
+        return user.orElse(null);
+    }
+
+    public Users findByHashEmail(String email){
+        Optional<Users> user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(email));
         return user.orElse(null);
     }
 
@@ -329,7 +355,7 @@ public class UserService {
      * 아이디(닉네임) 중복 체크
      */
     public boolean isNicknameAvailable(String nickname) {
-        Optional<Users> user = userRepository.findByNickname(nickname);
+        Optional<Users> user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname));
         return user.isEmpty(); // 사용 가능하면 true, 중복이면 false
     }
 
@@ -337,7 +363,7 @@ public class UserService {
      * 이메일 중복 체크
      */
     public boolean isEmailAvailable(String email) {
-        Optional<Users> user = userRepository.findByEmail(email);
+        Optional<Users> user = userRepository.findByHashValueEmail(email);
         return user.isEmpty(); // 사용 가능하면 true, 중복이면 false
     }
 
@@ -373,16 +399,16 @@ public class UserService {
     /**
      * 해당 이메일 사용자를 찾아서 비밀번호를 변경한다.
      * 비밀번호는 암호화처리 후 저장
-     * @param email
+     * @param encryptEmail
      * @param rawPassword
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public void updatePasswordByEmail(String email, String rawPassword) throws ExecutionException, InterruptedException {
+    public void updatePasswordByEmail(String encryptEmail, String rawPassword) throws ExecutionException, InterruptedException {
         String encoded = passwordEncoder.encode(rawPassword);
 
         List<QueryDocumentSnapshot> docs = firestore.collection("User")
-                .whereEqualTo("email", email)
+                .whereEqualTo("encryptEmail", encryptEmail)
                 .get()
                 .get()
                 .getDocuments();
@@ -427,17 +453,16 @@ public class UserService {
     public void deleteLinkedId(String email, String linked_id){
         try{
             // 사용자의 연동된 계정을 삭제하고
-            Users user = findByEmail(email);
+            Users user = findByEncryptedEmail(email);
 
-            List<String> user_linked_id = user.getLinked_id();
+            List<String> user_linked_id = user.getLinked_id(); // 암호화된 id들
             user_linked_id.remove(linked_id);
             user.setLinked_id(user_linked_id);
 
             userRepository.update(user);
 
             // 상대 연동 계정에서 나도 삭제한다.
-            Users linked_user = userRepository.findByNickname(linked_id)
-                    .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다: " + linked_id, HttpStatus.NOT_FOUND));
+            Users linked_user = findByNickname(linked_id);
 
             List<String> linked_user_linked_id = linked_user.getLinked_id();
             linked_user_linked_id.remove(user.getNickname());

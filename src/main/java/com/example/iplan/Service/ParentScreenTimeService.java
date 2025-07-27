@@ -1,5 +1,6 @@
 package com.example.iplan.Service;
 
+import com.example.iplan.DTO.ScreenTimeResultDTO;
 import com.example.iplan.Domain.ScreenTime;
 import com.example.iplan.Domain.ScreenTimeOCRResult;
 import com.example.iplan.ExceptionHandler.CustomException;
@@ -8,6 +9,7 @@ import com.example.iplan.Repository.InstalledAppsRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.Users;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,12 +25,11 @@ import java.util.concurrent.ExecutionException;
 @RequiredArgsConstructor
 public class ParentScreenTimeService {
     private final SetScreenTimeRepository setScreenTimeRepository;
-
     private final GetScreenTimeOCRRepository getScreenTimeOCRRepository;
-
     private final UserRepository userRepository;
+    private final AES256Encryptor aes;
 
-    public ResponseEntity<Map<String, Object>> getScreenTimeGraph(String user_id, String targetDate) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> getScreenTimeGraph(String user_id, String targetDate) throws Exception {
         List<String> child_id = getTargetChildID(user_id);
 
         if(!isCollectLinkedID(user_id, child_id))
@@ -36,12 +37,15 @@ public class ParentScreenTimeService {
 
         Map<String, Object> response = new HashMap<>();
 
-        List<ScreenTimeOCRResult> child_OCRresult_list = new ArrayList<>();
+        List<ScreenTimeResultDTO> child_OCRresult_list = new ArrayList<>();
 
         for(String child : child_id){
             ScreenTimeOCRResult result = getScreenTimeOCRRepository.findByDate(child, targetDate);
 
-            if(result != null) child_OCRresult_list.add(result);
+            if(result != null) {
+                ScreenTimeResultDTO resultDTO = ScreenTimeResultDTO.fromEntity(result, aes);
+                child_OCRresult_list.add(resultDTO);
+            }
         }
 
         if(child_OCRresult_list.isEmpty()){

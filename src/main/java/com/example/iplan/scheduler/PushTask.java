@@ -30,7 +30,7 @@ public class PushTask implements Runnable {
     public void run() {
         // 1. FcmRequestDTO 생성
         FcmRequestDTO requestDTO = FcmRequestDTO.builder()
-                .user_id(plan.getUser_id())
+                .user_id(plan.getHashed_user_id())
                 .fcmToken(fcmToken)
                 .notification(FcmRequestDTO.Notification.builder()
                         .title("iPlan")

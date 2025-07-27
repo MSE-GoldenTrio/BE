@@ -63,6 +63,8 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
             SecurityContextHolder.clearContext();
             // AuthenticationEntryPoint 직접 호출
             authenticationEntryPoint.commence(httpRequest, httpResponse, ex);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 

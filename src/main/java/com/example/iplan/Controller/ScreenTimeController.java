@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Controller
+@Slf4j
 @RequiredArgsConstructor
 @RequestMapping("/screen-time")
 public class ScreenTimeController {
@@ -29,8 +31,9 @@ public class ScreenTimeController {
     private final ScreenTimeService screenTimeService;
 
     @PostMapping("/upload")
-    public ResponseEntity<Map<String, Object>> uploadScreenTimeFile(@RequestParam("image")MultipartFile image, @AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam(value = "installed_apps", required = false) String installedAppsJson) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> uploadScreenTimeFile(@RequestParam("image")MultipartFile image, @AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam(value = "installed_apps", required = false) String installedAppsJson) throws Exception {
         String childNickname = user.getUsername();
+        log.info("스크린타임 사진 업로드 유저: " + childNickname);
 
         List<String> installedApps = null;
 
@@ -41,6 +44,8 @@ public class ScreenTimeController {
             } catch (JsonProcessingException e) {
                 throw new CustomException("앱 목록 파싱 실패", HttpStatus.BAD_REQUEST);
             }
+        }else{
+            System.out.println("앱 목록 비었거나 null임: " + installedAppsJson);
         }
 
         return screenTimeService.uploadScreenTimeImage(image, childNickname, installedApps);
@@ -53,7 +58,7 @@ public class ScreenTimeController {
     }
 
     @GetMapping("/showScreenTimeGraph/{targetDate}")
-    public ResponseEntity<Map<String, Object>> GetScreenTimeGraph(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String targetDate) throws ExecutionException, InterruptedException{
+    public ResponseEntity<Map<String, Object>> GetScreenTimeGraph(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String targetDate) throws Exception {
         String childNickname = user.getUsername();
         return screenTimeService.getScreenTimeGraph(childNickname, targetDate);
     }

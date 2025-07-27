@@ -44,7 +44,7 @@ public class RewardChildController {
                             @Content(schema = @Schema(implementation = RewardChildDTO.class))
                     }))
     @PostMapping
-    public ResponseEntity<Map<String, Object>> saveReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> saveReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws Exception {
 
         String childNickname = user.getUsername();
         log.info("Received RewardChildDTO: {}, AuthenticationPrincipal email: {}", rewardDto, childNickname);
@@ -58,7 +58,7 @@ public class RewardChildController {
      */
     @Operation(summary = "onSnapshot()으로 감지한 바뀐 보상 데이터 GET", description = "해당 사용자의 단일 보상 목록을 가져온다.")
     @GetMapping("/changed")
-    public ResponseEntity<Map<String, Object>> getChangedReward(@AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam("rewardId") String rewardId) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> getChangedReward(@AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam("rewardId") String rewardId) throws Exception {
         String nickname = user.getUsername();
         log.info("변경된 보상 ID: {}", rewardId);
         Map<String, Object> response = rewardChildService.getRewardById(nickname, rewardId);
@@ -98,6 +98,8 @@ public class RewardChildController {
             response.put("success", false);
             response.put("message", "보상 데이터를 가져오는 데 실패했습니다. Error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -127,6 +129,8 @@ public class RewardChildController {
             response.put("success", false);
             response.put("message", "보상 목록을 가져오는 데 실패했습니다. Error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -144,7 +148,7 @@ public class RewardChildController {
                             @Content(schema = @Schema(implementation = RewardChildDTO.class))
                     }))
     @PatchMapping("/update")
-    public ResponseEntity<Map<String, Object>> updateReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updateReward(@RequestBody @NotNull RewardChildDTO rewardDto, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws Exception {
         String childNickname = user.getUsername();
         log.info("Received RewardChildDTO for update reward: {}, AuthenticationPrincipal email: {}", rewardDto, childNickname);
         return rewardChildService.updateReward(rewardDto, childNickname);

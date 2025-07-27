@@ -7,6 +7,7 @@ import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.RewardChildRepository;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.Users;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,7 @@ public class RewardChildService {
 
     private final RewardChildRepository rewardChildRepository;
     private final UserRepository userRepository;
+    private final AES256Encryptor aes;
     /**
      * 새로운 보상을 저장하는 기능
      * @param rewardDto 저장할 보상 객체의 DTO
@@ -33,7 +35,7 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> saveReward(RewardChildDTO rewardDto, String nickname) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> saveReward(RewardChildDTO rewardDto, String nickname) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
         // 사용자 인증
@@ -43,7 +45,7 @@ public class RewardChildService {
         // 빌더 패턴을 사용하여 RewardChild 객체 생성
         RewardChild reward = RewardChild.builder()
                 .user_id(nickname)
-                .content(rewardDto.getContent())
+                .content(aes.encrypt(rewardDto.getContent()))
                 .post_date(rewardDto.getPost_date())
                 .post_year(rewardDto.getPost_year())
                 .post_month(rewardDto.getPost_month())
@@ -67,13 +69,14 @@ public class RewardChildService {
     /**
      * 사용자의 단일 보상 반환 -> onSnapshot() 감지로 인한 해당 보상의 데이터 반환
      */
-    public Map<String, Object> getRewardById(String childNickname, String rewardId) throws ExecutionException, InterruptedException {
+    public Map<String, Object> getRewardById(String childNickname, String rewardId) throws Exception {
         // rewardId에 해당하는 계획 가져오기
         RewardChild reward = rewardChildRepository.findRewardByID(rewardId);
-
+        reward.setContent(aes.decrypt(reward.getContent()));
         try {
             if (reward != null) {
                 // 보상의 user_id와 인증객체 유저와 일치한지 확인
+                log.info("아이쪽 단일 보상 조회 user_id : " + reward.getUser_id() + ", 요청 사용자 아이디: " + childNickname);
                 if (!Objects.equals(reward.getUser_id(), childNickname)) {
                     throw new CustomException("해당 보상에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
                 }
@@ -96,7 +99,7 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public RewardChildDTO getDailyReward(String nickname, int year, int month, int day) throws ExecutionException, InterruptedException {
+    public RewardChildDTO getDailyReward(String nickname, int year, int month, int day) throws Exception {
         String formattedDate = String.format("%04d-%02d-%02d", year, month, day); // "2025-03-28" 형식으로 만들기
 
         RewardChild rewardChild = rewardChildRepository.findRewardChildByDay(nickname, formattedDate);
@@ -105,13 +108,13 @@ public class RewardChildService {
             return null;  // 해당 날짜의 보상이 존재하지 않으면 null 반환
         }
 
-        log.info("Daily reward: {}", rewardChild.getContent());
+        log.info("Daily reward: {}", aes.decrypt(rewardChild.getContent()));
 
         // DTO로 변환하여 반환
         return RewardChildDTO.builder()
                 .id(rewardChild.getId())
-                .user_id(rewardChild.getUser_id())
-                .content(rewardChild.getContent())
+                .user_id(aes.decrypt(rewardChild.getUser_id()))
+                .content(aes.decrypt(rewardChild.getContent()))
                 .post_date(rewardChild.getPost_date())
                 .post_year(rewardChild.getPost_year())
                 .post_month(rewardChild.getPost_month())
@@ -128,7 +131,7 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public List<RewardChildDTO> getAllRewards(String nickname) throws ExecutionException, InterruptedException {
+    public List<RewardChildDTO> getAllRewards(String nickname) throws Exception {
         // 사용자가 존재하는지 확인
         Users user = userRepository.findByNickname(nickname)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -137,15 +140,20 @@ public class RewardChildService {
             // 사용자의 모든 보상을 가져오기
             List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(nickname);
 
+            for(RewardChildDTO dto : rewards){
+                dto.setUser_id(aes.decrypt(dto.getUser_id()));
+                dto.setContent(aes.decrypt(dto.getContent()));
+            }
+
             if (rewards.isEmpty()) {
-                log.info("{}'s reward is not exist.", nickname);
+                log.info("{}'s reward is not exist.", aes.decrypt(nickname));
             } else {
-                log.info("{}'s rewards received successfully!! Size: {}", nickname, rewards.size());
+                log.info("{}(복호화 됨)'s rewards received successfully!! Size: {}", aes.decrypt(nickname), rewards.size());
             }
 
             return rewards;
         } catch (Exception e) {
-            log.error("Error of {}: {}", nickname, e.getMessage());
+            log.error("Error of {}(복호화 됨): {}", aes.decrypt(nickname), e.getMessage());
             throw new ExecutionException("보상 목록을 가져오는 중 오류가 발생했습니다.", e);
         }
     }
@@ -191,7 +199,7 @@ public class RewardChildService {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public ResponseEntity<Map<String, Object>> updateReward(RewardChildDTO rewardDto, String nickname) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> updateReward(RewardChildDTO rewardDto, String nickname) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
         RewardChild existingReward = rewardChildRepository.findEntityByDocumentId(rewardDto.getId());
@@ -222,7 +230,7 @@ public class RewardChildService {
         RewardChild updatedReward = RewardChild.builder()
                 .id(existingReward.getId())
                 .user_id(rewardDto.getUser_id() != null ? rewardDto.getUser_id() : existingReward.getUser_id())
-                .content(rewardDto.getContent() != null ? rewardDto.getContent() : existingReward.getContent())
+                .content(rewardDto.getContent() != null ? aes.encrypt(rewardDto.getContent()) : existingReward.getContent())
                 .post_date(rewardDto.getPost_date() != null ? rewardDto.getPost_date() : existingReward.getPost_date())
                 .post_year(rewardDto.getPost_date() != null ? rewardDto.getPost_year() : existingReward.getPost_year())
                 .post_month(rewardDto.getPost_date() != null ? rewardDto.getPost_month() : existingReward.getPost_month())
