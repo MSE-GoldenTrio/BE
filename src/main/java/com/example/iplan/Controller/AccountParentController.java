@@ -28,6 +28,7 @@ public class AccountParentController {
     private final AccountParentService accountParentService;
     private final UserRepository userRepository;
 
+    // 부모가 아이에게 연동 요청 보냄
     @Operation(summary = "부모가 아이 계정 연동 요청을 보냄 POST", description = "해당 요청을 PendingAccountRequest 저장")
     @PostMapping("/link-child")
     public ResponseEntity<Map<String, Object>> parentAccountRequest(@RequestBody @NotNull AccountRequestDTO requestDTO, @AuthenticationPrincipal CustomOAuth2UserDetails user)
@@ -42,6 +43,7 @@ public class AccountParentController {
         return accountParentService.sendAccountRequest(childNickname, parentNicknameHash, parentNickname);
     }
 
+    // 부모가 이미 보낸 연동요청이 있는지 체크
     @GetMapping("/check-pending-status")
     public ResponseEntity<Map<String, Object>> checkPendingStatus(@AuthenticationPrincipal CustomOAuth2UserDetails user) {
         log.info("Check pending status API from parent received");
