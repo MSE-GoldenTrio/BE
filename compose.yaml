@@ -14,11 +14,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/iplan-3e9c2-feef2236cd5b.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/iplan-google.json
       - FIREBASE_CONFIG_PATH=/app/iplan-firebase.json
-    volumes:
-      - /home/ubuntu/iplan-3e9c2-feef2236cd5b.json:/app/iplan-3e9c2-feef2236cd5b.json
-      - /home/ubuntu/iplan-firebase.json:/app/iplan-firebase.json
     networks:
       - myboot
 
