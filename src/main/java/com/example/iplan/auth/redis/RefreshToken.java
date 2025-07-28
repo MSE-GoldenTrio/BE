@@ -26,7 +26,7 @@ public class RefreshToken {
     private Long expiration;
 
     public RefreshToken(CustomOAuth2UserDetails userDetails, String refreshToken, Long expiration){
-        this.id = userDetails.getUsername();    // 사용자 닉네임이 식별자
+        this.id = userDetails.getUsername();    // 암호화 되어있는 사용자 닉네임이 식별자
         this.refreshToken = refreshToken;
         this.expiration = expiration;
     }

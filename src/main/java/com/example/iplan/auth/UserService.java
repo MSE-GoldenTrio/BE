@@ -68,7 +68,7 @@ public class UserService {
     // 회원가입
     public String signUp(String nickname, String password, String name, String email, String roleStr) {
         try {
-            // 1. 아이디 중복 확인
+            // 1. 아이디 중복 확인 (닉네임 해시값으로 중복 비교)
             if (nickname != null && userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname)).isPresent()) {
                 throw new CustomException("Nickname already exists.", HttpStatus.NOT_FOUND);
             }
