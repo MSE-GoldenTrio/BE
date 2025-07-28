@@ -53,7 +53,7 @@ public class CustomOAuth2UserDetails implements OAuth2User, UserDetails {
         return user.getPassword();
     }
 
-     // Spring Security 에서 사용할 사용자 이름 (닉네임)
+     // Spring Security 에서 사용할 사용자 이름 (닉네임) -> 암호화 되어있음!!
      // Spring Security 의 인증 과정에서 사용자 식별을 위해 호출
      @Override
      public String getUsername() {
