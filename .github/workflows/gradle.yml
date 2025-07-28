@@ -56,6 +56,24 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # iplan-firebase.json 생성
+      - name: Create Firebase Key
+        run: |
+          mkdir ./src/main/resources || true
+          cd ./src/main/resources
+          rm -rf ./iplan-firebase.json || true
+          echo "${{ secrets.FIREBASE_KEY }}" | base64 --decode > ./iplan-firebase.json
+        shell: bash
+
+      # GOOGLE_APPLICATION_CREDENTIALS 파일 생성
+      - name: Create Firebase Key
+        run: |
+          mkdir ./src/main/resources || true
+          cd ./src/main/resources
+          rm -rf ./iplan-google.json || true
+          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" | base64 --decode > ./iplan-google.json
+        shell: bash
+
       # 2. Spring Boot 애플리케이션 빌드
       - name: Build with Gradle
         run: ./gradlew clean bootJar --no-daemon --warning-mode all

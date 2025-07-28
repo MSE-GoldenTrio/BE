@@ -30,6 +30,7 @@ public class Users {
     @Schema(description = "사용자 이메일", example = "abcd@gmail.com", requiredMode = Schema.RequiredMode.REQUIRED)
     private String email;
 
+    @Schema(description = "사용자 이메일 해시값")
     private String emailHash;
 
     @NotNull
