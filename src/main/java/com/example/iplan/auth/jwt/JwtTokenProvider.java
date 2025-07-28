@@ -35,9 +35,6 @@ public class JwtTokenProvider {
 
     private final AES256Encryptor aes;
 
-//    public static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24; // 24시간
-//    public static final long REFRESH_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24 * 30; // 30일
-
     // JwtProperties 를 통해 생성자 내부에서 key 를 초기화
     public JwtTokenProvider(
             RefreshTokenService refreshTokenService,
@@ -91,8 +88,8 @@ public class JwtTokenProvider {
         // Access Token 생성
         Date accessTokenExpiresIn = new Date(now + accessTokenExpiration);
         String accessToken = Jwts.builder()
-                .setSubject(aes.decrypt(nickname))
-                .claim("encryptedId", nickname)
+                .setSubject(aes.decrypt(nickname))  // 복호화된 닉네임!!
+                .claim("encryptedId", nickname)     // 암호화된 닉네임!!
                 .claim("email", aes.decrypt(email))
                 .claim("role", role.name()) // Enum 값 저장 (CHILD, PARENT)
                 .claim("linked_id", decodedLinkedId)  // 리스트로 저장
@@ -214,6 +211,9 @@ public class JwtTokenProvider {
     public String getUserNickname(String token) {
         return parseClaims(token).getSubject();
     }
+
+    // 토큰의 암호화된 nickname(subject)을 가져옴
+    public String getEncryptedId(String token) { return parseClaims(token).get("encryptedId", String.class); }
 
     // 토큰의 만료시간 가져옴
     public Date getExpirationDate(String token) {
