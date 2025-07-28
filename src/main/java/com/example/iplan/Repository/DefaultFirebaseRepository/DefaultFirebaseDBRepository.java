@@ -1,10 +1,12 @@
 package com.example.iplan.Repository.DefaultFirebaseRepository;
 
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.google.cloud.firestore.annotation.DocumentId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
 
@@ -211,9 +213,9 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
 
         if(documentSnapshot.exists()){
             return documentSnapshot.toObject(entityClass);
+        }else{
+            throw new CustomException("해당 ID의 그래프 데이터 문서가 없습니다.", HttpStatus.NOT_FOUND);
         }
-
-        return null;
     }
 
     /**
