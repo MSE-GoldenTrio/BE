@@ -33,7 +33,7 @@ public class ScreenTimeResultDTO {
     public static ScreenTimeResultDTO fromEntity(ScreenTimeOCRResult result, AES256Encryptor aes) throws Exception {
         return ScreenTimeResultDTO.builder()
                 .id(result.getId())
-                .user_id(result.getUser_id())
+                .user_id(aes.decrypt(result.getUser_id()))
                 .date(result.getDate())
                 .result(aes.decryptJsonObject(result.getResult(), new TypeReference<>() {}))
                 .isSuccess(result.isSuccess())

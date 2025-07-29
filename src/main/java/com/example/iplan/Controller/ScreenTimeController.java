@@ -52,7 +52,7 @@ public class ScreenTimeController {
     }
 
     @GetMapping("/showTimeSet/{targetDate}")
-    public ResponseEntity<Map<String, Object>> GetScreenTime(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String targetDate) throws ExecutionException, InterruptedException{
+    public ResponseEntity<Map<String, Object>> GetScreenTime(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String targetDate) throws Exception {
         String childNickname = user.getUsername();
         return screenTimeService.getScreenTime(childNickname, targetDate);
     }
