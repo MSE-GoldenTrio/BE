@@ -7,7 +7,9 @@ import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.RewardChildRepository;
 import com.example.iplan.Service.AlarmService;
 import com.example.iplan.Service.PlanChildService;
+import com.example.iplan.fcm.FcmRequestDTO;
 import com.example.iplan.fcm.FcmRequestService;
+import com.example.iplan.fcm.FcmToken;
 import com.example.iplan.fcm.FcmTokenService;
 import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
@@ -16,6 +18,7 @@ import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.RefreshTokenService;
 import com.example.iplan.util.AES256Encryptor;
 import com.example.iplan.scheduler.PushSchedulerService;
+import com.google.api.Http;
 import com.google.api.client.util.Value;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
@@ -452,7 +455,7 @@ public class UserService {
      */
     public void deleteLinkedId(String email, String linked_id){
         try{
-            // 사용자의 연동된 계정을 삭제하고
+            // 부모의 연동된 계정을 삭제하고
             Users user = findByEncryptedEmail(email);
 
             List<String> user_linked_id = user.getLinked_id(); // 암호화된 id들
@@ -461,7 +464,7 @@ public class UserService {
 
             userRepository.update(user);
 
-            // 상대 연동 계정에서 나도 삭제한다.
+            // 아이 연동 계정에서 나도 삭제한다.
             Users linked_user = findByNickname(linked_id);
 
             List<String> linked_user_linked_id = linked_user.getLinked_id();
@@ -469,6 +472,36 @@ public class UserService {
             linked_user.setLinked_id(linked_user_linked_id);
 
             userRepository.update(linked_user);
+
+            // 연동 해제 되었다는 알림을 보낼 상대의 FcmToken찾기
+            List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(DigestUtils.sha256Hex(aes.decrypt(linked_id)));
+
+            log.info("연동 해제하는 상대의 nickname {}", aes.decrypt(linked_id));
+            try{
+                if(!fcmTokens.isEmpty()){
+                    for(FcmToken fcmToken : fcmTokens){
+                        FcmRequestDTO requestDto = FcmRequestDTO.builder()
+                                .user_id(fcmToken.getUser_id())
+                                .fcmToken(fcmToken.getToken())
+                                .notification(FcmRequestDTO.Notification.builder()
+                                        .title("iPlan")
+                                        .body(aes.decrypt(user.getNickname()) + "부모님이 연동 해제하였습니다.")
+                                        .build())
+                                .data(FcmRequestDTO.Data.builder()
+                                        .pendingRequestId(null)
+                                        .sender(aes.decrypt(user.getNickname()))
+                                        .type("DeleteLinkedId")
+                                        .build())
+                                .build();
+                        fcmRequestService.sendPush(requestDto);
+                        log.info("연동 해제 알람을 성공적으로 보냈습니다.");
+                    }
+                }else{
+                    log.warn("연동 요청을 보낼 아이({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(linked_id));
+                }
+            }catch (Exception e){
+                throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            }
 
         }catch (Exception e){
             throw new CustomException("연동 아이디 제거 중 오류 발생: "+ e.getMessage(), HttpStatus.BAD_REQUEST);
