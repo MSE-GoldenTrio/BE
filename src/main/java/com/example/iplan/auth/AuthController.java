@@ -71,8 +71,8 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("RefreshToken이 일치하지 않습니다. 다시 로그인 해주세요.");
         }
 
-        // 3. DB에서 유저 정보 다시 조회 (최신 linked_id 등을 위해)
-        CustomOAuth2UserDetails userDetails = userService.loadUserByEncryptedNickname(encryptedNickname); // 구현 필요
+        // 3. DB에서 유저 정보 다시 조회 (최신 linked_id 등을 위해) 후 CustomOAuth2UserDetails 재생성
+        CustomOAuth2UserDetails userDetails = userService.loadUserByEncryptedNickname(encryptedNickname);
 
         if (userDetails == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("사용자 정보를 찾을 수 없습니다.");
