@@ -1,6 +1,7 @@
 package com.example.iplan.Domain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.annotation.DocumentId;
 import com.google.firebase.database.annotations.NotNull;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -45,4 +46,7 @@ public class ScreenTime {
     @JsonFormat(pattern = "HH:mm")
     @NotNull
     private String goalTime;
+
+    @Schema(description = "문서 최종 수정 시간")
+    private Timestamp updated_at;
 }

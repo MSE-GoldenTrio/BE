@@ -2,6 +2,7 @@ package com.example.iplan.Domain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.annotation.DocumentId;
 import com.google.firebase.database.annotations.NotNull;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -67,5 +68,8 @@ public class PlanChild {
     @Schema(description = "계획 달성 여부", example = "false", requiredMode = Schema.RequiredMode.REQUIRED)
     @JsonProperty("is_completed")
     private boolean is_completed;
+
+    @Schema(description = "문서 최종 수정 시간")
+    private Timestamp updated_at;
 
 }

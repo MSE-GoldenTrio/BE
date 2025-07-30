@@ -305,6 +305,7 @@ public class UserController {
         if(email != null){
             userService.deleteLinkedId(email, linked_id);
             return ResponseEntity.ok(Map.of(
+                    "success", true,
                     "message", "연결된 계정 삭제에 성공하였습니다."
             ));
         }else{

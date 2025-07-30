@@ -1,7 +1,5 @@
 package com.example.iplan.Controller;
 
-import com.example.iplan.DTO.FeedbackDTO;
-import com.example.iplan.Domain.RewardParents;
 import com.example.iplan.Service.RewardParentsService;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import io.swagger.v3.oas.annotations.Operation;

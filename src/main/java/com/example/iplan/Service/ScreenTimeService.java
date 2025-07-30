@@ -74,12 +74,12 @@ public class ScreenTimeService {
 
             System.out.println("result null이어서 false response 발송");
 
-            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(response, HttpStatus.OK);
         }
 
         ScreenTimeResultDTO resultDTO = ScreenTimeResultDTO.builder()
                         .id(result.getId())
-                        .user_id(result.getUser_id())
+                        .user_id(aes.decrypt(result.getUser_id()))
                         .date(result.getDate())
                         .result(aes.decryptJsonObject(result.getResult(), new TypeReference<Map<String, Object>>() {}))
                         .isSuccess(result.isSuccess())
@@ -93,7 +93,7 @@ public class ScreenTimeService {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    public ResponseEntity<Map<String, Object>> getScreenTime(String user_id, String targetDate) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> getScreenTime(String user_id, String targetDate) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
         System.out.println("사용자 아이디: "+user_id+", 날짜: "+targetDate);
@@ -104,12 +104,13 @@ public class ScreenTimeService {
             response.put("success", false);
             response.put("message", "해당 날짜의 설정된 스크린 타임이 없습니다.");
 
-            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(response, HttpStatus.OK);
         }
 
         String deadlineTime = result.getDeadLineTime();
         String goalTime = result.getGoalTime();
 
+        response.put("user_id", aes.decrypt(result.getUser_id()));
         response.put("date", targetDate);
         response.put("deadLineTime", deadlineTime);
         response.put("goalTime", goalTime);

@@ -1,10 +1,13 @@
 package com.example.iplan.Repository.DefaultFirebaseRepository;
 
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.google.api.core.ApiFuture;
+import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.*;
 import com.google.cloud.firestore.annotation.DocumentId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
 
@@ -93,7 +96,6 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         }).get();
     }
 
-
     /**
      * Auto Increment된 ID를 사용하여 저장하는 saveWithId 메서드
      */
@@ -102,6 +104,8 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
 
         // Auto Increment ID 가져오기
         String documentId = String.valueOf(getNextAutoIncrementId(collectionName));
+
+        setUpdatedAtField(entity);
 
         // Firestore에 데이터 저장
         ApiFuture<WriteResult> result = collection.document(documentId).set(entity);
@@ -136,6 +140,9 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
     @Override
     public void update(T entity) throws ExecutionException, InterruptedException {
         CollectionReference collection = firestore.collection(collectionName);
+
+        setUpdatedAtField(entity);
+
         ApiFuture<WriteResult> result = collection.document(getDocumentId(entity)).set(entity);
         result.get();
     }
@@ -211,9 +218,9 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
 
         if(documentSnapshot.exists()){
             return documentSnapshot.toObject(entityClass);
+        }else{
+            throw new CustomException("해당 ID의 데이터 문서가 없습니다.", HttpStatus.NOT_FOUND);
         }
-
-        return null;
     }
 
     /**
@@ -365,5 +372,15 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         }
 
         return query;
+    }
+
+    private void setUpdatedAtField(T entity){
+        try{
+            Field field = entity.getClass().getDeclaredField("updated_at");
+            field.setAccessible(true);
+            field.set(entity, Timestamp.now());
+        }catch(NoSuchFieldException | IllegalAccessException e){
+            log.warn("updated_at 필드 설정 실패: {}", e.getMessage());
+        }
     }
 }

@@ -15,10 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -52,7 +49,7 @@ public class ParentScreenTimeService {
             response.put("success", false);
             response.put("message", "연동된 아이들 중 스크린타임 분석 그래프 대한 데이터가 존재하지 않습니다.");
 
-            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(response, HttpStatus.OK);
         }
 
         response.put("entity", child_OCRresult_list);
@@ -61,7 +58,7 @@ public class ParentScreenTimeService {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    public ResponseEntity<Map<String, Object>> getScreenTime(String user_id, String targetDate) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> getScreenTime(String user_id, String targetDate) throws Exception {
         List<String> child_id = getTargetChildID(user_id);
 
         if(!isCollectLinkedID(user_id, child_id))
@@ -72,21 +69,65 @@ public class ParentScreenTimeService {
 
         for(String child : child_id){
             ScreenTime result = setScreenTimeRepository.findByDate(child, targetDate);
-
-            if(result != null) child_screenTime_list.add(result);
+            if(result != null){
+                result.setUser_id(aes.decrypt(result.getUser_id()));
+                child_screenTime_list.add(result);
+            }
         }
 
         if(child_screenTime_list.isEmpty()){
             response.put("success", false);
             response.put("message", "연동된 아이들 중 스크린타임 타임셋에 대한 데이터가 존재하지 않습니다.");
 
-            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>(response, HttpStatus.OK);
         }
 
         response.put("entity", child_screenTime_list);
         response.put("success", true);
 
         return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    public Map<String, Object> getOneGraphData(String parentEncryptedNickname, String graphId, String childId) throws ExecutionException, InterruptedException {
+        Map<String, Object> response = new HashMap<>();
+
+        ScreenTimeOCRResult graphData = getScreenTimeOCRRepository.findEntityByDocumentId(graphId);
+
+        try{
+            if(graphData != null){
+                if(!Objects.equals(graphData.getUser_id(), childId)){
+                    throw new CustomException("해당 그래프 데이터에 대한 접근 권한이 없습니다.", HttpStatus.NOT_ACCEPTABLE);
+                }
+                ScreenTimeResultDTO resultDTO = ScreenTimeResultDTO.fromEntity(graphData, aes);
+                response.put("success", true);
+                response.put("entity", resultDTO);
+            }
+        }catch (Exception e){
+            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        return response;
+    }
+
+    public Map<String, Object> getOneTimeData(String parentEncryptedNickname, String docId, String childId) throws ExecutionException, InterruptedException {
+        Map<String, Object> response = new HashMap<>();
+
+        ScreenTime screenTime = setScreenTimeRepository.findEntityByDocumentId(docId);
+
+        try{
+            if(screenTime != null){
+                if(!Objects.equals(screenTime.getUser_id(), childId)){
+                    throw new CustomException("해당 스크린타임 시간 데이터에 대한 접근 권한이 없습니다.", HttpStatus.NOT_ACCEPTABLE);
+                }
+                screenTime.setUser_id(aes.decrypt(screenTime.getUser_id()));
+                response.put("success", true);
+                response.put("entity", screenTime);
+            }
+        }catch (Exception e){
+            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        return response;
     }
 
     private boolean isCollectLinkedID(String user_id, List<String> child_id){
