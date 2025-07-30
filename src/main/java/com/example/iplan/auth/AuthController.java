@@ -47,10 +47,13 @@ public class AuthController {
         String accessToken = request.getAccessToken();
         String refreshToken = request.getRefreshToken();
 
+        log.info("토큰 재발급 요청 옴!!");
+
         // 1. accessToken 에서 암호화 되어있는!! nickname 추출
         String encryptedNickname;
         try {
             encryptedNickname = jwtTokenProvider.getEncryptedId(accessToken);
+            log.info("암호화된 유저 닉네임: {}", encryptedNickname);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("유효하지 않은 AccessToken입니다.");
         }
@@ -68,10 +71,17 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("RefreshToken이 일치하지 않습니다. 다시 로그인 해주세요.");
         }
 
-        // 3. Authentication 추출
-        Authentication authentication = jwtTokenProvider.getAuthentication(accessToken);
+        // 3. DB에서 유저 정보 다시 조회 (최신 linked_id 등을 위해)
+        CustomOAuth2UserDetails userDetails = userService.loadUserByEncryptedNickname(encryptedNickname); // 구현 필요
 
-        // 4. 만료까지 남은 시간 확인
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("사용자 정보를 찾을 수 없습니다.");
+        }
+
+        // 4. 새 Authentication 객체 생성
+        Authentication authentication = jwtTokenProvider.createAuthentication(userDetails);
+
+        // 5. 만료까지 남은 시간 확인
         Date expirationDate = jwtTokenProvider.getExpirationDate(refreshToken);
         long now = System.currentTimeMillis();
         long remainingMillis = expirationDate.getTime() - now;
@@ -80,7 +90,7 @@ public class AuthController {
 //        long oneWeekMillis = 60 * 1000;
 
 
-        // 5. refreshToken 은 조건에 따라 새로 발급하거나 유지
+        // 6. refreshToken 은 조건에 따라 새로 발급하거나 유지
         JwtToken newToken;
         if (remainingMillis <= oneWeekMillis) {
             log.info("RefreshToken 남은 기간이 7일 이내 → 갱신 수행");
@@ -89,8 +99,10 @@ public class AuthController {
             long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60;
             refreshTokenService.saveToken((CustomOAuth2UserDetails) authentication.getPrincipal(), newToken.getRefreshToken(), expirationMinutes);
         } else {
+
+            // 7. accessToken 은 항상 새로 발급
             log.info("RefreshToken 충분히 남아 있음 → accessToken만 재발급");
-            // 6. accessToken 은 항상 새로 발급
+
             String newAccessToken = jwtTokenProvider.generateNewAccessToken(authentication);
 
             newToken = JwtToken.builder()
