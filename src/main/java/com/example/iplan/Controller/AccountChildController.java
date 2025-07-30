@@ -3,6 +3,7 @@ package com.example.iplan.Controller;
 import com.example.iplan.DTO.AccountRequestDTO;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Service.AccountChildService;
+import com.example.iplan.auth.Users;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -27,43 +28,16 @@ import java.util.concurrent.ExecutionException;
 public class AccountChildController {
     private final AccountChildService accountChildService;
 
-    @GetMapping("/pending-requests")
-    public ResponseEntity<Map<String, Object>> getChildPendingRequests(@AuthenticationPrincipal CustomOAuth2UserDetails user) {
-        Map<String, Object> response = new HashMap<>();
-        log.info("Account API from child received!");
-        try {
-            String childNickname = user.getUsername();
-            List<AccountRequestDTO> requests = accountChildService.getPendingRequestsForChild(childNickname);
-
-            if (requests.isEmpty()) {
-                response.put("success", false);
-                response.put("message", "도착한 연동 요청이 없습니다.");
-            } else {
-                response.put("success", true);
-                response.put("requests", requests);
-            }
-
-            return ResponseEntity.ok(response);
-        } catch (ExecutionException | InterruptedException e) {
-            response.put("success", false);
-            response.put("message", "연동 요청을 가져오는 데 실패했습니다. Error: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     @PostMapping("/respond-request")
     public ResponseEntity<?> respondToRequest(@AuthenticationPrincipal CustomOAuth2UserDetails user,
                                               @RequestBody AccountRequestDTO dto) {
         try {
-            String newToken = accountChildService.respondToRequest(user.getUsername(), dto);
-            log.info("새로운 토큰: {}", newToken);
-            if (newToken != null) {
+            Users users = accountChildService.respondToRequest(user.getUsername(), dto);
+            log.info("linked id updated: {}", users);
+            if (users != null) {
                 return ResponseEntity.ok(Map.of(
                         "success", true,
-                        "message", "요청이 승인되었으며 토큰이 갱신되었습니다.",
-                        "token", newToken
+                        "message", "요청이 승인되었으며 토큰이 갱신되었습니다."
                 ));
             } else {
                 return ResponseEntity.ok(Map.of(
