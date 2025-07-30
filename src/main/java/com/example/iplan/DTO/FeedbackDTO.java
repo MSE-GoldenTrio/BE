@@ -23,6 +23,5 @@ public class FeedbackDTO {
     private boolean success; // 보상을 지급하였는지 보류하였는지 (계획을 모두 달성했는가)
 
     @Schema(description = "문서 최종 수정 시간")
-    @NotNull
     private Timestamp updated_at;
 }

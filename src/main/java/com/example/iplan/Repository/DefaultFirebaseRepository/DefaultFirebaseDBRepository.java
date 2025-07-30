@@ -219,7 +219,7 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         if(documentSnapshot.exists()){
             return documentSnapshot.toObject(entityClass);
         }else{
-            throw new CustomException("해당 ID의 그래프 데이터 문서가 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("해당 ID의 데이터 문서가 없습니다.", HttpStatus.NOT_FOUND);
         }
     }
 

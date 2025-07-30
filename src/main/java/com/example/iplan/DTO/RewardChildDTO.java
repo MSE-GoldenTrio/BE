@@ -40,6 +40,5 @@ public class RewardChildDTO {
     private boolean success; // 보상이 지급 or 보류
 
     @Schema(description = "문서 최종 수정 시간")
-    @NotNull
     private Timestamp updated_at;
 }

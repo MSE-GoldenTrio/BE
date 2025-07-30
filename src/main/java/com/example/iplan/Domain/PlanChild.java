@@ -70,7 +70,6 @@ public class PlanChild {
     private boolean is_completed;
 
     @Schema(description = "문서 최종 수정 시간")
-    @NotNull
     private Timestamp updated_at;
 
 }

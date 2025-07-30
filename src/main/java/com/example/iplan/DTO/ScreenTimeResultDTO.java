@@ -33,7 +33,6 @@ public class ScreenTimeResultDTO {
     private boolean isSuccess;
 
     @Schema(description = "문서 최종 수정 시간")
-    @NotNull
     private Timestamp updated_at;
 
     public static ScreenTimeResultDTO fromEntity(ScreenTimeOCRResult result, AES256Encryptor aes) throws Exception {

@@ -48,6 +48,5 @@ public class ScreenTime {
     private String goalTime;
 
     @Schema(description = "문서 최종 수정 시간")
-    @NotNull
     private Timestamp updated_at;
 }
