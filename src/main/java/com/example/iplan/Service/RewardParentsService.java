@@ -91,6 +91,7 @@ public class RewardParentsService {
             if (reward != null) {
                 // 보상의 user_id와 인증객체 유저와 일치한지 확인
                 if (!Objects.equals(reward.getUser_id(), user.getNickname())) {
+                    log.info("reward의 User_id: {}, Child의 닉네임: {}", reward.getUser_id(), user.getNickname());
                     throw new CustomException("해당 보상에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
                 }
                 reward.setUser_id(aes.decrypt(reward.getUser_id()));

@@ -54,6 +54,7 @@ public class RewardParentsController {
             @RequestParam("rewardId") String rewardId,
             @RequestParam("childNickname") String childNickname) throws ExecutionException, InterruptedException {
 
+        log.info("단일 보상 반환 요청 id: {}, childNickname: {}", rewardId, childNickname);
         Map<String, Object> response = rewardParentsService.getRewardById(childNickname, rewardId);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
