@@ -36,9 +36,10 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
         }
     }
 
-    public Optional<Users> findByNickname(String nickname) {
+    // 암호화된 닉네임으로 찾기
+    public Optional<Users> findByEncryptedNickname(String encryptedNickname) {
         try {
-            Users user = findByField("nickname", nickname); // 아이디(닉네임) 기반으로 조회
+            Users user = findByField("nickname", encryptedNickname);
             return Optional.ofNullable(user);
         } catch (ExecutionException | InterruptedException e) {
             e.printStackTrace();
