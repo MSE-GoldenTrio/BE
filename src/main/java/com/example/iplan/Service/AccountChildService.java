@@ -32,64 +32,32 @@ public class AccountChildService {
     private final AES256Encryptor aes;
 
     /**
-     * 자녀가 부모의 연동 요청을 확인
-     * 아직 승인되지 않은 요청만 필터링 (approved == false && status == pending)
-     * 반환값은 List<AccountRequestDTO> 형태
-     */
-    public List<AccountRequestDTO> getPendingRequestsForChild(String childNickname) throws Exception {
-        // 1. 자녀가 존재하는지 확인
-        Users user = userRepository.findByNickname(childNickname)
-                .orElseThrow(() -> new CustomException("자녀 닉네임에 해당하는 사용자가 존재하지 않습니다.", HttpStatus.NOT_FOUND));
-
-        log.info("Get pending account requests for child [{}] started!", childNickname);
-
-        try {
-            // 2. 승인되지 않은 pending 요청만 필터링
-            List<PendingAccountRequest> pendingList = accountRepository.findByChildNicknameAndApprovedAndStatus(DigestUtils.sha256Hex(aes.decrypt(childNickname)), false, "pending");
-
-            if (pendingList.isEmpty()) {
-                log.info("No pending account requests found for child: {}", aes.decrypt(childNickname));
-            } else {
-                log.info("Pending account requests retrieved. Count: {}", pendingList.size());
-            }
-
-            // DTO 변환 후 반환
-            return pendingList.stream()
-                    .map(accountRepository::convertToDTO)
-                    .toList();
-
-        } catch (Exception e) {
-            log.error("Error while fetching account requests for child [{}]: {}", aes.decrypt(childNickname), e.getMessage());
-            throw new ExecutionException("계정 연동 요청을 가져오는 중 오류가 발생했습니다.", e);
-        }
-    }
-
-    /**
      * 아이가 부모의 요청을 승인 or 거부
      * 이때 아이의 linked_id에 이미 부모가 존재한다면 수락 못하도록 !!
      */
-    public String respondToRequest(String childNickname, AccountRequestDTO dto)
+    public Users respondToRequest(String encryptedChildNickname, AccountRequestDTO dto)
             throws Exception {
 
         log.info("연동 요청 응답 서비스");
 
-        // 1. 요청 ID로 단일 요청 조회
+        // 1. 요청 ID로 PendingAccountRequst 조회 (부모가 요청 보낼 때 저장되어있음)
         PendingAccountRequest request = accountRepository.findEntityByDocumentId(dto.getId());
         if (request == null) {
             throw new CustomException("해당 요청이 존재하지 않습니다.", HttpStatus.NOT_FOUND);
         }
 
-        if (!request.getChildHashedNickname().equals(DigestUtils.sha256Hex(aes.decrypt(childNickname)))) {
+        // 해시값으로 아이 닉네임 비교
+        if (!request.getChildHashedNickname().equals(DigestUtils.sha256Hex(aes.decrypt(encryptedChildNickname)))) {
             throw new CustomException("본인의 요청만 처리할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
 
-        String parentNickname = request.getParentHashedNickname();
-        log.info("Parent Nickname: {}", parentNickname);
+        String encryptedParentNickname = request.getParentEncryptedNickname();
+        log.info("부모의 암호화된 닉네임: {}", encryptedParentNickname);
         log.info("연동 요청 승인 여부: {}", dto.isApproved());
 
         // 2. 사용자 정보 조회
-        Users childUser = userRepository.findByNickname(childNickname).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        Users parentUser = userRepository.findByHashValueNickName(parentNickname).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Users childUser = userRepository.findByEncryptedNickname(encryptedChildNickname).orElseThrow(() -> new IllegalArgumentException("해당 아이 유저가 존재하지 않습니다."));
+        Users parentUser = userRepository.findByEncryptedNickname(encryptedParentNickname).orElseThrow(() -> new IllegalArgumentException("해당 부모 유저가 존재하지 않습니다."));
 
         if (childUser == null || parentUser == null) {
             throw new CustomException("유저 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
@@ -104,30 +72,24 @@ public class AccountChildService {
             throw new CustomException("이미 다른 계정과 연동되어 있어 수락할 수 없습니다.", HttpStatus.BAD_REQUEST);
         }
 
+        // 승인하는 경우
         if (dto.isApproved()) {
             request.setApproved(true);
             request.setStatus("approved");
             accountRepository.update(request);
 
-            if (!childUser.getLinked_id().contains(parentUser.getNickname())) {
-                childUser.getLinked_id().add(parentUser.getNickname());
+            if (!childUser.getLinked_id().contains(encryptedParentNickname)) {
+                childUser.getLinked_id().add(encryptedParentNickname);
             }
-            if (!parentUser.getLinked_id().contains(childNickname)) {
-                parentUser.getLinked_id().add(childNickname);
+            if (!parentUser.getLinked_id().contains(encryptedChildNickname)) {
+                parentUser.getLinked_id().add(encryptedChildNickname);
             }
             userRepository.update(childUser);
             userRepository.update(parentUser);
 
-            log.info("부모-자녀 연결 완료: {} <-> {}", parentNickname, childNickname);
+            log.info("부모-자녀 연결 완료: {} <-> {}", encryptedParentNickname, encryptedChildNickname);
 
-            // 연동 완료된 childUser로 토큰 재발급
-            CustomOAuth2UserDetails userDetails = new CustomOAuth2UserDetails(childUser);
-            Authentication authentication = new UsernamePasswordAuthenticationToken(
-                    userDetails, null, userDetails.getAuthorities()
-            );
-            JwtToken newToken = jwtTokenProvider.generateToken(authentication);
-            log.info("계정 연동으로 child 토큰 재발급: {}", newToken);
-            return newToken.getAccessToken();
+            return childUser;
         } else {
             request.setApproved(false);
             request.setStatus("denied");
