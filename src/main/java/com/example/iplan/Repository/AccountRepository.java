@@ -42,12 +42,12 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
     }
 
     // 수락되지 않은 동일한 요청이 이미 존재하는지 확인
-    public PendingAccountRequest findExistingRequest(String childNickname, String parentNickname)
+    public PendingAccountRequest findExistingRequest(String childHashedNickname, String parentEncryptedNickname)
         throws ExecutionException, InterruptedException {
 
         Map<String, Object> filters = Map.of(
-                "childNickname", childNickname,
-                "parentNickname", parentNickname,
+                "childHashedNickname", childHashedNickname,
+                "parentEncryptedNickname", parentEncryptedNickname,
                 "approved", false,
                 "status", "pending"
         );
@@ -55,12 +55,12 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
     }
 
     // 이미 해당 계정과 연동이 되어있는지 확인
-    public PendingAccountRequest findApprovedRequest(String childNickname, String parentNickname)
+    public PendingAccountRequest findApprovedRequest(String childHashedNickname, String parentEncryptedNickname)
         throws ExecutionException, InterruptedException {
 
         Map<String, Object> filters = Map.of(
-                "childNickname", childNickname,
-                "parentNickname", parentNickname,
+                "childHashedNickname", childHashedNickname,
+                "parentEncryptedNickname", parentEncryptedNickname,
                 "approved", true,
                 "status", "approved"
         );
@@ -68,11 +68,11 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
     }
 
     // 부모가 보낸 요청이 있는지 확인
-    public PendingAccountRequest findParentRequest(String parentNickname)
+    public PendingAccountRequest findParentRequest(String parentEncryptedNickname)
             throws ExecutionException, InterruptedException {
 
         Map<String, Object> filters = Map.of(
-                "parentNickname", parentNickname
+                "parentEncryptedNickname", parentEncryptedNickname
         );
         return findByFields(filters);
     }
@@ -84,7 +84,7 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
         return AccountRequestDTO.builder()
                 .id(entity.getId())
                 .childNickname(entity.getChildHashedNickname())
-                .parentNickname(entity.getParentHashedNickname())
+                .parentNickname(entity.getParentEncryptedNickname())
                 .approved(entity.isApproved())
                 .build();
     }
