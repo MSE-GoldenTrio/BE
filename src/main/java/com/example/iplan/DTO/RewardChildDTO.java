@@ -2,6 +2,9 @@ package com.example.iplan.DTO;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.google.cloud.Timestamp;
+import com.google.firebase.database.annotations.NotNull;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
 @Getter
@@ -35,4 +38,7 @@ public class RewardChildDTO {
     private boolean rewarded; // 보상이 지급되었는지 여부
 
     private boolean success; // 보상이 지급 or 보류
+
+    @Schema(description = "문서 최종 수정 시간")
+    private Timestamp updated_at;
 }

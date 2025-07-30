@@ -69,9 +69,10 @@ public class ParentScreenTimeService {
 
         for(String child : child_id){
             ScreenTime result = setScreenTimeRepository.findByDate(child, targetDate);
-            result.setUser_id(aes.decrypt(result.getUser_id()));
-
-            child_screenTime_list.add(result);
+            if(result != null){
+                result.setUser_id(aes.decrypt(result.getUser_id()));
+                child_screenTime_list.add(result);
+            }
         }
 
         if(child_screenTime_list.isEmpty()){
