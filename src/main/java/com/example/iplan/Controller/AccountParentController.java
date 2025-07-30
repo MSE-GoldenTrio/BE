@@ -36,37 +36,26 @@ public class AccountParentController {
         log.info("Account API from parent received!");
 
         String childNickname = requestDTO.getChildNickname();
-        String parentNicknameHash = userRepository.findByNickname(user.getUsername()).orElseThrow(()
-                -> new IllegalArgumentException("UserNotFound")).getNicknameHash();
-        String parentNickname = user.getUsername();
+        String encryptedParentNickname = user.getUsername();
 
-        return accountParentService.sendAccountRequest(childNickname, parentNicknameHash, parentNickname);
+        return accountParentService.sendAccountRequest(childNickname, encryptedParentNickname);
     }
 
     // 부모가 이미 보낸 연동요청이 있는지 체크
     @GetMapping("/check-pending-status")
     public ResponseEntity<Map<String, Object>> checkPendingStatus(@AuthenticationPrincipal CustomOAuth2UserDetails user) {
         log.info("Check pending status API from parent received");
-        String parentNickname = user.getUser().getNickname();
-        return accountParentService.getParentPendingStatus(parentNickname);
+        String encryptedParentNickname = user.getUsername();
+        return accountParentService.getParentPendingStatus(encryptedParentNickname);
     }
 
-    @GetMapping("/check-linked")
-    public ResponseEntity<Map<String, Object>> checkIfLinked(@RequestParam String childNickname, @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
-        log.info("Account linked check API from parent received");
-
-        String parentNickname = user.getUsername();
-        log.info("Parent Nickname:{}", parentNickname);
-
-        return accountParentService.checkParentLinkedId(childNickname, parentNickname);
-    }
-
+    // 연동 요청이 거부된 것은 부모가 확인 후에 엔티티에서 삭제
     @DeleteMapping("/delete-denied-request")
     public ResponseEntity<Map<String, Object>> deleteDeniedRequest(
             @AuthenticationPrincipal CustomOAuth2UserDetails user) {
         log.info("Delete denied request API from parent received");
 
-        return accountParentService.deleteDeniedRequest(user.getUser().getNickname());
+        return accountParentService.deleteDeniedRequest(user.getUsername());
     }
 
 }
