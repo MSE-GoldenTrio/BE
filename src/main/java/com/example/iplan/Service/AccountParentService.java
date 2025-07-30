@@ -44,7 +44,7 @@ public class AccountParentService {
     /**
      * 부모가 자녀 닉네임을 입력하여 연동 요청을 보냄
      */
-    public ResponseEntity<Map<String, Object>> sendAccountRequest(String childNickname, String parentNicknameHash, String parentNickname)
+    public ResponseEntity<Map<String, Object>> sendAccountRequest(String childNickname, String encryptedParentNickname)
             throws ExecutionException, InterruptedException {
 
         Map<String, Object> response = new HashMap<>();
@@ -59,7 +59,7 @@ public class AccountParentService {
             throw new CustomException("입력한 닉네임은 자녀 계정이 아닙니다.", HttpStatus.BAD_REQUEST);
         }
 
-        // 3. 이미 연동된 자녀인지 확인
+        // 3. 이미 다른 부모와 연동된 자녀인지 확인
         log.info("이미 연동된 자녀인지 체크..");
         List<String> linkedIds = childUser.getLinked_id();
         if (linkedIds != null && linkedIds.stream().anyMatch(Objects::nonNull)) {
@@ -70,7 +70,7 @@ public class AccountParentService {
 
         log.info("수락되지 않은 동일한 요청 체크..");
         // 4. 수락되지 않은 동일한 요청이 이미 존재하는지 확인
-        PendingAccountRequest existingRequest = accountRepository.findExistingRequest(childNicknameHash, parentNicknameHash);
+        PendingAccountRequest existingRequest = accountRepository.findExistingRequest(childNicknameHash, encryptedParentNickname);
         if (existingRequest != null) {
             response.put("success", false);
             response.put("message", "이미 해당 자녀에게 연동 요청을 보냈습니다. 요청이 승인될 때까지 기다려주세요.");
@@ -79,7 +79,7 @@ public class AccountParentService {
 
         log.info("이미 해당 계정과 연동이 되어있는지 체크..");
         // 5. 이미 해당 계정과 연동이 되어있는지 확인
-        PendingAccountRequest approvedRequest = accountRepository.findApprovedRequest(childNicknameHash, parentNicknameHash);
+        PendingAccountRequest approvedRequest = accountRepository.findApprovedRequest(childNicknameHash, encryptedParentNickname);
         if (approvedRequest != null) {
             response.put("success", false);
             response.put("message", "이미 해당 자녀와 연동이 되어있습니다.");
@@ -89,7 +89,7 @@ public class AccountParentService {
         // 5. PendingAccountRequest 생성
         PendingAccountRequest request = PendingAccountRequest.builder()
                 .childHashedNickname(childNicknameHash)
-                .parentHashedNickname(parentNicknameHash)
+                .parentEncryptedNickname(encryptedParentNickname)
                 .approved(false)
                 .status("pending")
                 .build();
@@ -101,7 +101,7 @@ public class AccountParentService {
         // 7. 연동 요청을 보낼 아이의 FcmToken 찾기
         List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(childUser.getNicknameHash()); //아이디 해시값으로 찾기
 
-        log.info("parentNickname = {}", parentNickname);
+        log.info("encryptedParentNickname = {}", encryptedParentNickname);
         try {
             if(!fcmTokens.isEmpty()){
                 // 8. 아이의 존재하는 모든 FcmToken 으로 푸시알림 전송
@@ -112,11 +112,11 @@ public class AccountParentService {
                             .fcmToken(fcmToken.getToken()) // 그냥 아무것도 안된 token
                             .notification(FcmRequestDTO.Notification.builder()
                                     .title("iPlan")
-                                    .body(aes.decrypt(parentNickname) + " 부모님이 연동 요청을 보냈습니다. 눌러서 확인하세요.") // 평문 id
+                                    .body(aes.decrypt(encryptedParentNickname) + " 부모님이 연동 요청을 보냈습니다. 눌러서 확인하세요.") // 평문 id
                                     .build())
                             .data(FcmRequestDTO.Data.builder()
                                     .pendingRequestId(request.getId())
-                                    .sender(aes.decrypt(parentNickname)) // 평문 id
+                                    .sender(aes.decrypt(encryptedParentNickname)) // 평문 id
                                     .type("AccountLinkRequest")
                                     .build())
                             .build();
@@ -140,91 +140,52 @@ public class AccountParentService {
     /**
      * 부모가 이미 보낸 연동요청이 있는지 체크
      */
-    public ResponseEntity<Map<String, Object>> getParentPendingStatus(String parentNickname) {
+    public ResponseEntity<Map<String, Object>> getParentPendingStatus(String encryptedParentNickname) {
         try {
-            PendingAccountRequest pendingRequests = accountRepository.findParentRequest(parentNickname);
+            PendingAccountRequest pendingRequests = accountRepository.findParentRequest(encryptedParentNickname);
 
             if (pendingRequests != null) {
-                String childNickname = pendingRequests.getChildHashedNickname();
-                log.info("Child Nickname: {}", childNickname);
+                String childHashedNickname = pendingRequests.getChildHashedNickname();
+                log.info("요청된 child 해시 닉네임: {}", childHashedNickname);
+
+                // Users 테이블에서 childHashedNickname 일치하는 사용자 찾기
+                Users childUser = userRepository.findByHashValueNickName(childHashedNickname)
+                        .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", HttpStatus.NOT_FOUND));
+                if (childUser == null) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                            "success", false,
+                            "message", "해당 자녀 사용자를 찾을 수 없습니다."
+                    ));
+                }
+
+                // 복호화된 닉네임 얻기
+                String decryptedNickname = aes.decrypt(childUser.getNickname());
+                log.info("복호화된 자녀 닉네임: {}", decryptedNickname);
+
                 return ResponseEntity.ok(Map.of(
                         "success", true,
-                        "childNickname", childNickname
+                        "childNickname", decryptedNickname
                 ));
             } else {
                 return ResponseEntity.ok(Map.of("status", "none"));
             }
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "success", "false",
+                    "success", false,
                     "message", e.getMessage()
             ));
         }
     }
 
-    /**
-     * 부모의 요청이 승인되었는지 linked_id 확인
-     * 만약 승인되었다면 토큰 재발급 후 페이지 이동
-     * 만약 거절되었다면 오류 응답 반환
-     */
-    public ResponseEntity<Map<String, Object>> checkParentLinkedId(String childNickname, String parentNickname)
-            throws ExecutionException, InterruptedException {
-
-        try {
-            // 1. 요청이 승인된 경우
-            PendingAccountRequest accountRequest = accountRepository.findByChildNicknameAndParentNickname(childNickname, parentNickname);
-            if (accountRequest != null && accountRequest.isApproved() && Objects.equals(accountRequest.getStatus(), "approved")) {
-                // 사용자 정보 조회
-                Users parentUser = userRepository.findByField("nickname", parentNickname);
-                // 연동 완료된 parentUser로 토큰 재발급
-                CustomOAuth2UserDetails userDetails = new CustomOAuth2UserDetails(parentUser);
-                Authentication authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities()
-                );
-                JwtToken newToken = jwtTokenProvider.generateToken(authentication);
-                log.info("요청 승인됨.. 토큰 재발급 완료");
-                accountRepository.delete(accountRequest);
-                return ResponseEntity.ok(Map.of(
-                        "success", true,
-                        "status", "approved",
-                        "message", String.format("%s 계정에 대한 연동 요청이 승인되었습니다.", childNickname),
-                        "token", newToken
-                ));
-            }
-            // 2. 요청이 거부된 경우
-            else if (accountRequest != null && !accountRequest.isApproved() && Objects.equals(accountRequest.getStatus(), "denied")) {
-                log.info("요청 거부됨");
-
-                accountRepository.delete(accountRequest);
-                return ResponseEntity.ok(Map.of(
-                        "success", true,
-                        "status", "denied",
-                        "message", String.format("%s 계정에 대한 연동 요청이 거부되었습니다.", childNickname)
-                ));
-            }
-            // 3. 아직 요청이 승인이 안 된 경우
-            else if (accountRequest != null && !accountRequest.isApproved() && Objects.equals(accountRequest.getStatus(), "pending")) {
-                log.info("아직 요청이 승인 안됨");
-                return ResponseEntity.ok(Map.of(
-                        "success", true,
-                        "status", "pending",
-                        "message", String.format("%s 계정에 대한 연동 요청이 승인될 때까지 기다려주세요.", childNickname)
-                ));
-            }
-            return null;
-        } catch (Exception e) {
-            throw new ExecutionException("계정 연동 요청을 가져오는 중 오류가 발생했습니다.", e);
-        }
-    }
 
     /**
      * 연동 요청이 거부된 것은 부모가 확인 후에 엔티티에서 삭제
      */
-    public ResponseEntity<Map<String, Object>> deleteDeniedRequest(String parentNickname) {
+    public ResponseEntity<Map<String, Object>> deleteDeniedRequest(String encryptedParentNickname) {
         try {
             PendingAccountRequest deniedRequest = accountRepository.findByFields(
                     Map.of(
-                            "parentNickname", parentNickname,
+                            "parentEncryptedNickname", encryptedParentNickname,
                             "approved", false,
                             "status", "denied"
                     )
