@@ -1,9 +1,11 @@
 package com.example.iplan.Domain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.annotation.DocumentId;
 import com.google.cloud.firestore.annotation.PropertyName;
 import com.google.firebase.database.annotations.NotNull;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import org.springframework.stereotype.Component;
 
@@ -43,6 +45,10 @@ public class RewardChild {
     private boolean rewarded; // 보상이 지급되었는지 여부 -> 첨삭 여부
 
     private boolean success; // 보상이 지급 or 보류
+
+    @Schema(description = "문서 최종 수정 시간")
+    @NotNull
+    private Timestamp updated_at;
 
     /*
     private boolean is_rewarded; // 보상이 지급되었는지 여부
