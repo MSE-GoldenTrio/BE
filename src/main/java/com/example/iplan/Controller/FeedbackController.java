@@ -54,7 +54,8 @@ public class FeedbackController {
     public ResponseEntity<Map<String, Object>> getAllFeedbackList(
             @AuthenticationPrincipal CustomOAuth2UserDetails user) throws ExecutionException, InterruptedException {
 
-        String parentNickname = user.getUsername();
+        // 암호화 되어있음
+        String encryptedParentNickname = user.getUsername();
         List<String> linkedIds = user.getUser().getLinked_id();
 
         // 예외 처리: 연동된 자녀가 없는 경우
@@ -62,10 +63,10 @@ public class FeedbackController {
             return new ResponseEntity<>(Map.of("success", false, "message", "연동된 자녀가 없습니다."), HttpStatus.BAD_REQUEST);
         }
 
-        return feedbackService.getAllFeedbacks(parentNickname);
+        return feedbackService.getAllFeedbacks(encryptedParentNickname);
     }
 
-    // 부모가 해당하는 아이에 대한 모든 피드백 가져옴 (child, parent 요청 모두 가능)
+    // 해당하는 아이에 대한 모든 피드백 가져옴
     @GetMapping("/feedback/list/{childNickname}")
     public ResponseEntity<Map<String, Object>> getFeedbackParents(@AuthenticationPrincipal CustomOAuth2UserDetails user, @PathVariable String childNickname)
             throws Exception {

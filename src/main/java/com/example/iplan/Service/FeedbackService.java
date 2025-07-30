@@ -7,7 +7,6 @@ import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.FeedbackRepository;
 import com.example.iplan.Repository.RewardChildRepository;
 import com.example.iplan.auth.UserRepository;
-import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.Users;
 import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
@@ -85,16 +84,16 @@ public class FeedbackService {
     /**
      * 부모의 모든 피드백 목록 반환
      */
-    public ResponseEntity<Map<String, Object>> getAllFeedbacks(String parentNickname) throws ExecutionException, InterruptedException {
+    public ResponseEntity<Map<String, Object>> getAllFeedbacks(String encryptedParentNickname) throws ExecutionException, InterruptedException {
         Map<String, Object> response = new HashMap<>();
         try {
             // 사용자의 모든 피드백을 가져오기
-            List<Feedback> feedbacks = feedbackRepository.findFeedbackDtoByUserId(parentNickname);
+            List<Feedback> feedbacks = feedbackRepository.findFeedbackDtoByUserId(encryptedParentNickname);
 
             if (feedbacks.isEmpty()) {
                 response.put("success", false);
                 response.put("message", "피드백 목록이 존재하지 않습니다.");
-                log.info("피드백 목록이 존재하지 않습니다.: {}", parentNickname);
+                log.info("피드백 목록이 존재하지 않습니다.: {}", encryptedParentNickname);
             } else {
                 for(Feedback feedback : feedbacks){
                     feedback.setChild_id(aes.decrypt(feedback.getChild_id()));
@@ -103,12 +102,12 @@ public class FeedbackService {
                 }
                 response.put("success", true);
                 response.put("feedbacks", feedbacks);
-                log.info("{}'s feedbacks received successfully!! Size: {}", parentNickname, feedbacks.size());
+                log.info("{}'s feedbacks received successfully!! Size: {}", encryptedParentNickname, feedbacks.size());
             }
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("Error of {}: {}", parentNickname, e.getMessage());
+            log.error("Error of {}: {}", encryptedParentNickname, e.getMessage());
             throw new ExecutionException("보상 목록을 가져오는 중 오류가 발생했습니다.", e);
         }
     }

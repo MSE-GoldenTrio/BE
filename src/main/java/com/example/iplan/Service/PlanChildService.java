@@ -53,7 +53,7 @@ public class PlanChildService {
         String encryptedTitle = aes.encrypt(planPostDto.getTitle());
         String encryptedMemo = aes.encrypt(planPostDto.getMemo());
 
-        Users user = userRepository.findByNickname(user_id).orElseThrow(() -> new IllegalArgumentException("User not found."));
+        Users user = userRepository.findByEncryptedNickname(user_id).orElseThrow(() -> new IllegalArgumentException("User not found."));
         String hashedNickname = user.getNicknameHash();
 
         // 계획 포스트에 해시된 유저 아이디 필드 추가

@@ -43,16 +43,16 @@ public class PlanParentService {
     /**
      * 날짜 제한 없이 사용자와 연동된 유저의 모든 계획 목록 반환
      */
-    public Map<String, Object> getAllPlans(String childNickname) throws Exception {
+    public Map<String, Object> getAllPlans(String encryptedChildNickname) throws Exception {
         Map<String, Object> response = new HashMap<>();
 
-        // childNickname 기반으로 아이의 모든 계획 가져오기
-        List<PlanChild> plans = planChildRepository.findEntityAll(childNickname);
+        // 암호화된 childNickname 기반으로 아이의 모든 계획 가져오기
+        List<PlanChild> plans = planChildRepository.findEntityAll(encryptedChildNickname);
 
         if (plans == null || plans.isEmpty()) {
             response.put("success", false);
             response.put("message", "등록된 계획이 없습니다.");
-            log.info("Get plan for {} failed!", aes.decrypt(childNickname));
+            log.info("No plan for {}", aes.decrypt(encryptedChildNickname));
         } else {
             // Firestore의 문서 ID를 PlanChild 객체에 설정
             // 저장된 계획 중 ID가 없는 경우는 비정상 데이터이므로 오류 유도
@@ -60,13 +60,14 @@ public class PlanParentService {
                 if (plan.getId() == null) {
                     throw new IllegalStateException("계획 ID가 없는 데이터가 존재합니다. DB 무결성을 확인해주세요.");
                 }
+                // 복호화해서 반환
                 plan.setUser_id(aes.decrypt(plan.getUser_id()));
                 plan.setTitle(aes.decrypt(plan.getTitle()));
                 plan.setMemo(aes.decrypt(plan.getMemo()));
             }
             response.put("success", true);
             response.put("plans", plans);
-            log.info("Get plan for {} successfully!", aes.decrypt(childNickname));
+            log.info("Get plan for {} successfully!", aes.decrypt(encryptedChildNickname));
         }
         return response;
     }

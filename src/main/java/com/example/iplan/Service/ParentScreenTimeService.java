@@ -141,7 +141,7 @@ public class ParentScreenTimeService {
     }
 
     private List<String> getTargetChildID(String parent_id){;
-        Users parent = userRepository.findByNickname(parent_id).orElseThrow(() -> new IllegalArgumentException("User not found."));
+        Users parent = userRepository.findByEncryptedNickname(parent_id).orElseThrow(() -> new IllegalArgumentException("User not found."));
         List<String> child_id_list = parent != null ? parent.getLinked_id() : null;
 
         if(child_id_list == null){

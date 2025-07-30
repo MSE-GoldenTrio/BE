@@ -39,7 +39,7 @@ public class RewardChildService {
         Map<String, Object> response = new HashMap<>();
 
         // 사용자 인증
-        Users user = userRepository.findByNickname(nickname)
+        Users user = userRepository.findByEncryptedNickname(nickname)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         // 빌더 패턴을 사용하여 RewardChild 객체 생성
@@ -133,7 +133,7 @@ public class RewardChildService {
      */
     public List<RewardChildDTO> getAllRewards(String nickname) throws Exception {
         // 사용자가 존재하는지 확인
-        Users user = userRepository.findByNickname(nickname)
+        Users user = userRepository.findByEncryptedNickname(nickname)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         log.info("Get all rewards start!!");
         try {
