@@ -92,8 +92,8 @@ public class JwtTokenProvider {
                 .claim("encryptedId", nickname)     // 암호화된 닉네임!!
                 .claim("email", aes.decrypt(email))
                 .claim("role", role.name()) // Enum 값 저장 (CHILD, PARENT)
-                .claim("linked_id", decodedLinkedId)  // 리스트로 저장
-                .claim("encrypted_linked_id", encryptedLinkedId)
+                .claim("linked_id", decodedLinkedId)  // 리스트로 저장 (복호화된 linked_id)
+                .claim("encrypted_linked_id", encryptedLinkedId)    // 암호화된 linked_id
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
@@ -229,14 +229,24 @@ public class JwtTokenProvider {
         List<String> linked_id = userDetails.getUser().getLinked_id();
         UserRole role = userDetails.getUser().getAuthority();
 
+        List<String> decodedLinkedId = new ArrayList<>();
+        List<String> encryptedLinkedId = new ArrayList<>();
+
+        for(String id : linked_id){
+            decodedLinkedId.add(aes.decrypt(id));
+            encryptedLinkedId.add(id);
+        }
+
         long now = System.currentTimeMillis();
         Date accessTokenExpiresIn = new Date(now + accessTokenExpiration);
 
         return Jwts.builder()
-                .setSubject(aes.decrypt(nickname))
+                .setSubject(aes.decrypt(nickname))  // 복호화된 닉네임!!
+                .claim("encryptedId", nickname)     // 암호화된 닉네임!!
                 .claim("email", aes.decrypt(email))
-                .claim("role", role.name())
-                .claim("linked_id", linked_id)
+                .claim("role", role.name()) // Enum 값 저장 (CHILD, PARENT)
+                .claim("linked_id", decodedLinkedId)  // 리스트로 저장 (복호화된 linked_id)
+                .claim("encrypted_linked_id", encryptedLinkedId)    // 암호화된 linked_id
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
@@ -260,4 +270,15 @@ public class JwtTokenProvider {
         blacklistRepository.save(blacklist);
         log.info("{} 사용자 토큰 블랙리스트 등록 완료: {}", nickname, accessToken);
     }
+
+    // 최신 유저 정보로 Authentication 객체 생성
+    public Authentication createAuthentication(CustomOAuth2UserDetails userDetails) {
+        // 권한 리스트 구성 ("ROLE_PARENT" 또는 "ROLE_CHILD")
+        List<GrantedAuthority> authorities = Collections.singletonList(
+                new SimpleGrantedAuthority(userDetails.getUser().getAuthority().getRole())
+        );
+
+        return new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
+    }
+
 }
