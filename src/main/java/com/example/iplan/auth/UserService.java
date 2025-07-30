@@ -332,12 +332,12 @@ public class UserService {
      * 닉네임을 기반으로 사용자 조회
      */
     public Users findByNickname(String nickname) {
-        Optional<Users> user = userRepository.findByNickname(nickname);
+        Optional<Users> user = userRepository.findByEncryptedNickname(nickname);
         return user.orElse(null); // 사용자 없을 경우 null 반환
     }
 
     public Users findByHashNickname(String nickname){
-        Optional<Users> user = userRepository.findByNickname(nickname);
+        Optional<Users> user = userRepository.findByEncryptedNickname(nickname);
         return user.orElse(null); // 사용자 없을 경우 null 반환
     }
 
@@ -373,7 +373,7 @@ public class UserService {
     public void updateUserRole(String nickname, String roleStr) {
         try {
             // 닉네임으로 사용자 조회
-            Users user = userRepository.findByNickname(nickname)
+            Users user = userRepository.findByEncryptedNickname(nickname)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
             // 문자열을 UserRole Enum 으로 변환
@@ -474,5 +474,24 @@ public class UserService {
             throw new CustomException("연동 아이디 제거 중 오류 발생: "+ e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+
+    /**
+     * 암호화된 닉네임(encryptedNickname)을 기반으로 CustomOAuth2UserDetails 반환
+     */
+    public CustomOAuth2UserDetails loadUserByEncryptedNickname(String encryptedNickname) {
+        try {
+            Optional<Users> optionalUser = userRepository.findByEncryptedNickname(encryptedNickname);
+            if (optionalUser.isEmpty()) {
+                throw new UsernameNotFoundException("해당 암호화된 닉네임의 사용자를 찾을 수 없습니다.");
+            }
+
+            Users user = optionalUser.get();
+            return new CustomOAuth2UserDetails(user);
+        } catch (Exception e) {
+            log.error("loadUserByEncryptedNickname 오류: {}", e.getMessage());
+            throw new CustomException("사용자 정보를 불러오는 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
 }
 
