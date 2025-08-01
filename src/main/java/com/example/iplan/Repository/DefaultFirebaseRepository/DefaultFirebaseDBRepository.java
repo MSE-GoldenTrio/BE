@@ -351,6 +351,32 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
     }
 
     /**
+     * status IN (...) 조건과 다른 필드 조건을 조합해서 단일 문서를 찾음
+     * @param equalityField
+     * @param equalityValue
+     * @param inField
+     * @param inValues
+     */
+    public T findByFieldAndInList(String equalityField, Object equalityValue,
+                                  String inField, List<?> inValues)
+            throws ExecutionException, InterruptedException {
+
+        CollectionReference collection = firestore.collection(collectionName);
+
+        Query query = collection.whereEqualTo(equalityField, equalityValue)
+                .whereIn(inField, inValues);
+
+        ApiFuture<QuerySnapshot> future = query.get();
+        QuerySnapshot snapshot = future.get();
+
+        if (!snapshot.isEmpty()) {
+            return snapshot.getDocuments().get(0).toObject(entityClass);
+        }
+
+        return null;
+    }
+
+    /**
      * entity 객체에서 문서 ID를 추출한다.
      * entity가 DocumentId를 포함하는 필드가 있다면 해당 필드에서 ID를 가져온다.
      * @param entity 추출하고 싶은 ID의 객체
