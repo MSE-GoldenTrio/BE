@@ -18,63 +18,29 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
         setCollectionName("PendingAccountRequest");
     }
 
-    public List<PendingAccountRequest> findByChildNicknameAndApprovedAndStatus(String childNickname, boolean approved, String status)
-            throws ExecutionException, InterruptedException {
+    public PendingAccountRequest findExistingRequest(String childEncryptedNickname, String parentEncryptedNickname, Boolean approved, String status)
+        throws ExecutionException, InterruptedException {
 
         Map<String, Object> filters = Map.of(
-                "childNickname", childNickname,
+                "childEncryptedNickname", childEncryptedNickname,
+                "parentEncryptedNickname", parentEncryptedNickname,
                 "approved", approved,
                 "status", status
         );
-
-        return findAllByFields(filters);
+        return findByFields(filters);
     }
 
-    public PendingAccountRequest findByChildNicknameAndParentNickname(String childNickname, String parentNickname)
+    // 부모가 보낸 요청이 있는지 확인 -> status 여러개 조건 포함
+    public PendingAccountRequest findParentRequestByStatuses(String parentEncryptedNickname, List<String> statuses)
             throws ExecutionException, InterruptedException {
 
-        Map<String, Object> filters = Map.of(
-                "childNickname", childNickname,
-                "parentNickname", parentNickname
-        );
-
-        return findByFields(filters);
+        return findByFieldAndInList("parentEncryptedNickname", parentEncryptedNickname, "status", statuses);
     }
 
-    // 수락되지 않은 동일한 요청이 이미 존재하는지 확인
-    public PendingAccountRequest findExistingRequest(String childHashedNickname, String parentEncryptedNickname)
+    // PendingAccountRequest 문서 ID로 요청 반환
+    public PendingAccountRequest findByRequestId(String docId)
         throws ExecutionException, InterruptedException {
-
-        Map<String, Object> filters = Map.of(
-                "childHashedNickname", childHashedNickname,
-                "parentEncryptedNickname", parentEncryptedNickname,
-                "approved", false,
-                "status", "pending"
-        );
-        return findByFields(filters);
-    }
-
-    // 이미 해당 계정과 연동이 되어있는지 확인
-    public PendingAccountRequest findApprovedRequest(String childHashedNickname, String parentEncryptedNickname)
-        throws ExecutionException, InterruptedException {
-
-        Map<String, Object> filters = Map.of(
-                "childHashedNickname", childHashedNickname,
-                "parentEncryptedNickname", parentEncryptedNickname,
-                "approved", true,
-                "status", "approved"
-        );
-        return findByFields(filters);
-    }
-
-    // 부모가 보낸 요청이 있는지 확인
-    public PendingAccountRequest findParentRequest(String parentEncryptedNickname)
-            throws ExecutionException, InterruptedException {
-
-        Map<String, Object> filters = Map.of(
-                "parentEncryptedNickname", parentEncryptedNickname
-        );
-        return findByFields(filters);
+        return findEntityByDocumentId(docId);
     }
 
     /**
@@ -83,7 +49,7 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
     public AccountRequestDTO convertToDTO(PendingAccountRequest entity) {
         return AccountRequestDTO.builder()
                 .id(entity.getId())
-                .childNickname(entity.getChildHashedNickname())
+                .childNickname(entity.getChildEncryptedNickname())
                 .parentNickname(entity.getParentEncryptedNickname())
                 .approved(entity.isApproved())
                 .build();
