@@ -44,9 +44,6 @@ public class CustomOAuth2UserDetails implements OAuth2User, UserDetails {
     // 사용자 이메일 가져오기
     public String getEmail() { return user.getEmail(); }
 
-    // 사용자 Firebase Authentication UID 가져오기
-    public String getFirebaseAuthUID() { return user.getFirebaseAuthUID(); }
-
     // 사용자 비밀번호 (OAuth2 로그인 시 null)
     @Override
     public String getPassword() {
