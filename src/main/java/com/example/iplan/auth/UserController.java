@@ -136,7 +136,7 @@ public class UserController {
         userInfo.put("id", user.getId());
         userInfo.put("nickname", aes.decrypt(user.getNickname()));
         userInfo.put("email", aes.decrypt(user.getEmail()));
-        userInfo.put("name", user.getName());
+        userInfo.put("name", aes.decrypt(user.getName()));
         userInfo.put("authority", user.getAuthority().name());
         userInfo.put("linked_id", user.getLinked_id() != null ? user.getLinked_id() : ""); // null 방지
         userInfo.put("uid", user.getFirebaseAuthUID() != null ? user.getFirebaseAuthUID() : "");
