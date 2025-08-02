@@ -37,8 +37,7 @@ public class AuthController {
                                            @AuthenticationPrincipal CustomOAuth2UserDetails customOAuth2UserDetails) throws Exception {
         String accessToken = authHeader.replace("Bearer ", "");
         String encryptedUserId = customOAuth2UserDetails.getUsername();
-        String uid = customOAuth2UserDetails.getFirebaseAuthUID();
-        String result = userService.withdraw(accessToken, fcmToken, encryptedUserId, uid); // 탈퇴 처리 서비스 호출
+        String result = userService.withdraw(accessToken, fcmToken, encryptedUserId); // 탈퇴 처리 서비스 호출
         return ResponseEntity.ok(result);
     }
 
