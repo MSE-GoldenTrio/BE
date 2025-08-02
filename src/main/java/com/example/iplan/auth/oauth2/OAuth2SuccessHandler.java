@@ -54,7 +54,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             UserRecord userRecord;
             try {
                 // 이메일로 이미 존재하는지 확인
-                userRecord = FirebaseAuth.getInstance().getUserByEmail(user.getEmail());
+                userRecord = FirebaseAuth.getInstance().getUserByEmail(aes.decrypt(user.getEmail()));
                 log.info("기존 Firebase Authentication 사용자: {}", userRecord.getUid());
             } catch (Exception e) {
                 // 존재하지 않으면 새로 생성 (UID 자등오르 랜덤 생성됨)
