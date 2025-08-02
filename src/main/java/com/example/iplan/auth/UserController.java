@@ -87,7 +87,7 @@ public class UserController {
     @Operation(summary = "Firebase Custom Token 생성")
     public ResponseEntity<Map<String, String>> generateFirebaseToken(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails) throws FirebaseAuthException {
         String nickname = userDetails.getUsername();
-        Users user = userService.findByNickname(nickname);
+        Users user = userService.findByEncryptedNickname(nickname);
 
         String customToken = FirebaseAuth.getInstance().createCustomToken(user.getFirebaseAuthUID());
         log.info("Custom Token: {}", customToken);
@@ -125,7 +125,7 @@ public class UserController {
         }
 
         log.info("User nickname: {}", nickname);
-        Users user = userService.findByNickname(nickname);
+        Users user = userService.findByEncryptedNickname(nickname);
 
         if (user == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "User not found"));
@@ -166,7 +166,7 @@ public class UserController {
         // 따라서 1) DB 에서 사용자 객체 조회 2)정확한 권한을 포함한 Authentication 객체 생성 후 새로운 토큰을 발급
 
         // 1. 사용자 객체를 다시 조회 (업데이트된 정보 포함)
-        Users updatedUser = userService.findByNickname(nickname);
+        Users updatedUser = userService.findByEncryptedNickname(nickname);
         log.info("Updated user info: {}", updatedUser);
 
         // 2. 인증객체 생성
