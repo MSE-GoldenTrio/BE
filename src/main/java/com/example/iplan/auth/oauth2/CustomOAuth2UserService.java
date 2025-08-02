@@ -56,18 +56,19 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         // ** email 이 없으면 오류 발생시키기**
         if (oAuth2UserInfo.getEmail() == null || oAuth2UserInfo.getEmail().isEmpty()) {
-            throw new IllegalArgumentException("OAuth2 로그인 실패: 이메일이 없습니다.");
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("invalid_email", "OAuth2 로그인 실패: 이메일이 없습니다.", null)
+            );
         }
+
 
         // 사용자 저장 또는 업데이트 -> user 설정(반환)
         saveOrUpdate(oAuth2UserInfo, registrationId, oAuth2AccessToken);
         if (user == null) {
-            throw new RuntimeException("OAuth2 로그인 중 사용자 정보가 정상적으로 저장되지 않았습니다.");
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("user_null", "OAuth2 로그인 중 사용자 정보가 정상적으로 저장되지 않았습니다.", null)
+            );
         }
-
-        // JWT 발급 (닉네임을 랜덤으로 지정한 후 바로 발급)
-//        JwtToken jwtToken = generateJwtToken(user);
-//        log.info("OAuth2 Login JWT Token: {}", jwtToken.getAccessToken());
 
         return new CustomOAuth2UserDetails(user, oAuth2User.getAttributes());
     }
@@ -96,8 +97,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             } else {
                 // 2. 신규 회원이 로그인하는 경우 -> 랜덤 닉네임 생성 후 저장
                 if (oAuth2UserInfo.getEmail() == null || oAuth2UserInfo.getEmail().isEmpty()) {
-                    throw new IllegalArgumentException("OAuth2 로그인 실패: 이메일이 없습니다.");
+                    throw new OAuth2AuthenticationException(
+                            new OAuth2Error("invalid_email", "OAuth2 로그인 실패: 이메일이 없습니다.", null)
+                    );
                 }
+
                 String randomNickname = "user_" + UUID.randomUUID().toString().substring(0, 6);
                 user = Users.builder()
                         .email(aes.encrypt(oAuth2UserInfo.getEmail()))
@@ -117,23 +121,17 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 isNewUser = true; // 신규 회원
                 log.info("신규 소셜 사용자 등록: {}", user.getEmail());
             }
+        } catch (OAuth2AuthenticationException e) {
+            // 이미 래핑된 예외면 그대로 throw
+            throw e;
         } catch (Exception e) {
-            log.error("Firestore error: ", e);
-            throw new RuntimeException("서버 오류로 인해 로그인에 실패했습니다.");
+            log.error("saveOrUpdate 내부 오류", e);
+            // 모든 일반 예외를 OAuth2AuthenticationException으로 감싸기
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("server_error", "서버 오류로 인해 로그인에 실패했습니다.", null),
+                    e.getMessage()
+            );
         }
-    }
-
-    /**
-     * 사용자 정보를 기반으로 JWT 토큰을 생성
-     */
-    private JwtToken generateJwtToken(Users user) throws Exception {
-        CustomOAuth2UserDetails customUserDetails = new CustomOAuth2UserDetails(user);
-
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-                customUserDetails, null, customUserDetails.getAuthorities()
-        );
-
-        return jwtTokenProvider.generateToken(authentication);
     }
 
 }
