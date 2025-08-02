@@ -108,7 +108,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         .emailHash(DigestUtils.sha256Hex(oAuth2UserInfo.getEmail()))
                         .nickname(aes.encrypt(randomNickname))  // 암호화 저장, 랜덤 닉네임 할당
                         .nicknameHash(DigestUtils.sha256Hex(randomNickname)) // 중복 방지용
-                        .name(oAuth2UserInfo.getName())
+                        .name(aes.encrypt(oAuth2UserInfo.getName()))
                         .password("")
                         .authority(UserRole.UNKNOWN)
                         .linked_id(new ArrayList<>())
