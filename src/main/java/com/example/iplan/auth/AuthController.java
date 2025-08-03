@@ -43,10 +43,11 @@ public class AuthController {
 
     @PostMapping("/auth/refresh")
     public ResponseEntity<?> refreshAccessToken(@RequestBody TokenRefreshRequestDTO request) throws Exception {
+        log.info("토큰 재발급 요청 옴!!");
+
         String accessToken = request.getAccessToken();
         String refreshToken = request.getRefreshToken();
-
-        log.info("토큰 재발급 요청 옴!!");
+        log.info("토큰 재발급 refreshToken: {}", refreshToken);
 
         // 1. accessToken 에서 암호화 되어있는!! nickname 추출
         String encryptedNickname;
@@ -54,27 +55,35 @@ public class AuthController {
             encryptedNickname = jwtTokenProvider.getEncryptedId(accessToken);
             log.info("암호화된 유저 닉네임: {}", encryptedNickname);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("유효하지 않은 AccessToken입니다.");
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "유효하지 않은 AccessToken 입니다."));
         }
 
         // 2. Redis에서 refreshToken 조회 및 검증
         Optional<RefreshToken> optional = refreshTokenService.getToken(encryptedNickname);
       
         if (optional.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("RefreshToken이 만료되었거나 존재하지 않습니다. 다시 로그인 해주세요.");
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "RefreshToken이 만료되었거나 존재하지 않습니다."));
         }
 
         RefreshToken savedToken = optional.get();
 
         if (!savedToken.getRefreshToken().equals(refreshToken)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("RefreshToken이 일치하지 않습니다. 다시 로그인 해주세요.");
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "RefreshToken이 일치하지 않습니다. 다시 로그인 해주세요."));
         }
 
         // 3. DB에서 유저 정보 다시 조회 (최신 linked_id 등을 위해) 후 CustomOAuth2UserDetails 재생성
         CustomOAuth2UserDetails userDetails = userService.loadUserByEncryptedNickname(encryptedNickname);
 
         if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("사용자 정보를 찾을 수 없습니다.");
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "사용자 정보를 찾을 수 없습니다."));
         }
 
         // 4. 새 Authentication 객체 생성
