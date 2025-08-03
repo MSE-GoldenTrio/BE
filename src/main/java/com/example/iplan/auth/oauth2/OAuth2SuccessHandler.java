@@ -3,8 +3,11 @@ package com.example.iplan.auth.oauth2;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.UserService;
 import com.example.iplan.auth.Users;
+import com.example.iplan.auth.jwt.JwtProperties;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
+import com.example.iplan.auth.redis.RefreshToken;
+import com.example.iplan.auth.redis.RefreshTokenService;
 import com.example.iplan.util.AES256Encryptor;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.UserRecord;
@@ -34,6 +37,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final CustomOAuth2UserService customOAuth2UserService;
     private final UserRepository userRepository;
     private final AES256Encryptor aes;
+    private final JwtProperties jwtProperties;
+    private final RefreshTokenService refreshTokenService;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
@@ -85,6 +90,15 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         }
         log.info("OAuth2 Access Token: {}", jwtToken.getAccessToken());
         log.info("OAuth2 Refresh Token: {}", jwtToken.getRefreshToken());
+
+        // Refresh 토큰 Redis 에 저장
+        long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
+        refreshTokenService.saveToken(
+                (CustomOAuth2UserDetails) authentication.getPrincipal(),
+                jwtToken.getRefreshToken(),
+                expirationMinutes
+        );
+        log.info("Refresh 토큰 Redis 에 저장: user_id={}, ttl={}min", user.getNickname(), expirationMinutes);
 
         // React Native 앱으로 리다이렉트 (딥링크 사용)
         String redirectUrl = String.format("iplan://auth-callback?accessToken=%s&refreshToken=%s&needsAdditionalInfo=%s",
