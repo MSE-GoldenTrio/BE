@@ -16,9 +16,9 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
         setCollectionName("User");
     }
 
-    public Optional<Users> findByEncryptedEmail(String email) {
+    public Optional<Users> findByEncryptedEmail(String encryptedEmail) {
         try {
-            Users user = findByField("email", email); // 이메일을 기반으로 조회
+            Users user = findByField("email", encryptedEmail); // 이메일을 기반으로 조회
             return Optional.ofNullable(user);
         } catch (ExecutionException | InterruptedException e) {
             e.printStackTrace();

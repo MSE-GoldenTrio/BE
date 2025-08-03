@@ -352,8 +352,8 @@ public class UserService {
         return user.orElse(null); // 사용자 없을 경우 null 반환
     }
 
-    public Users findByEncryptedEmail(String email){
-        Optional<Users> user = userRepository.findByEncryptedEmail(email);
+    public Users findByEncryptedEmail(String encryptedEmail){
+        Optional<Users> user = userRepository.findByEncryptedEmail(encryptedEmail);
         return user.orElse(null);
     }
 
@@ -461,21 +461,24 @@ public class UserService {
     /**
      * 계정 연동 해제(계정 탈퇴 시에도 쓰임)
      */
-    public void deleteLinkedId(String email, String linked_id){
+    public void deleteLinkedId(String encryptedEmail, String encryptedLinkedId){
+        log.info("입력된 encryptedEmail: {}", encryptedEmail);
+        log.info("입력된 encryptedLinkedId: {}", encryptedLinkedId);
+
         try{
             // 1. 계정 연동 해제를 요청한(혹은 계정 탈퇴하는) 유저 조회
-            Users request_user = findByEncryptedEmail(email);
+            Users request_user = findByEncryptedEmail(encryptedEmail);
             log.info("연동을 해제를 요청하는 유저의 닉네임: {}", aes.decrypt(request_user.getNickname()));
 
             // 부모의 연동된 계정을 삭제하고
             List<String> request_user_linked_id = request_user.getLinked_id(); // 암호화된 id들
-            request_user_linked_id.remove(linked_id);
+            request_user_linked_id.remove(encryptedLinkedId);
             request_user.setLinked_id(request_user_linked_id);
 
             userRepository.update(request_user);
 
             // 2. (requestUser 와 연동된) linked_id 에 해당하는 유저 조회
-            Users linked_user = findByEncryptedNickname(linked_id);
+            Users linked_user = findByEncryptedNickname(encryptedLinkedId);
 
             // 아이 연동 계정에서 나도 삭제한다.
             List<String> linked_user_linked_id = linked_user.getLinked_id();
@@ -486,9 +489,9 @@ public class UserService {
             log.info("linked_id 삭제 완료");
 
             // 연동 해제 되었다는 알림을 보낼 상대의 FcmToken찾기
-            List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(DigestUtils.sha256Hex(aes.decrypt(linked_id)));
+            List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(DigestUtils.sha256Hex(aes.decrypt(encryptedLinkedId)));
 
-            log.info("연동 해제하는 상대의 nickname {}", aes.decrypt(linked_id));
+            log.info("연동 해제하는 상대의 nickname {}", aes.decrypt(encryptedLinkedId));
             try{
                 if(!fcmTokens.isEmpty()){
                     for(FcmToken fcmToken : fcmTokens){
@@ -509,7 +512,7 @@ public class UserService {
                         log.info("연동 해제 알람을 성공적으로 보냈습니다.");
                     }
                 }else{
-                    log.warn("연동 요청을 보낼 유저({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(linked_id));
+                    log.warn("연동 요청을 보낼 유저({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(encryptedLinkedId));
                 }
             }catch (Exception e){
                 throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
