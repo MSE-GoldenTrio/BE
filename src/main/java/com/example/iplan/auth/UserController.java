@@ -298,12 +298,13 @@ public class UserController {
     }
 
     @DeleteMapping("/my_page/delete/linked_id")
-    public ResponseEntity<?> deleteLinkedID(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails, @RequestParam("linked_id") String linked_id){
-        log.info("연결된 계정: " + linked_id);
+    public ResponseEntity<?> deleteLinkedID(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails, @RequestParam("linked_id") String encryptedLinkedId){
+        log.info("연동을 해제할 linked_id: {}", encryptedLinkedId);
 
-        String email = userDetails.getEmail();
-        if(email != null){
-            userService.deleteLinkedId(email, linked_id);
+        String encryptedEmail = userDetails.getEmail();
+        log.info("연동 해제를 요청한 계정의 email: {}", encryptedEmail);
+        if(encryptedEmail != null){
+            userService.deleteLinkedId(encryptedEmail, encryptedLinkedId);
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "message", "연결된 계정 삭제에 성공하였습니다."
