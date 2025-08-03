@@ -42,7 +42,7 @@ public class AccountChildController {
             if (users != null) {
                 return ResponseEntity.ok(Map.of(
                         "success", true,
-                        "message", "요청이 승인되었으며 토큰이 갱신되었습니다."
+                        "message", "요청이 승인되었습니다."
                 ));
             } else {
                 return ResponseEntity.ok(Map.of(
