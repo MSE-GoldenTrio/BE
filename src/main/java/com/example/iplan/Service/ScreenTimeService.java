@@ -350,6 +350,10 @@ public class ScreenTimeService {
                 }
             }
 
+            if(categories.isEmpty()){
+                log.info("사용자 기기에 추가되지 않은 어플이 있습니다.");
+                throw new CustomException("사진과 사용자 기기의 정보가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
+            }
             result.put(KEY_CATEGORIES, categories);
             return result;
         }catch(Exception e){
