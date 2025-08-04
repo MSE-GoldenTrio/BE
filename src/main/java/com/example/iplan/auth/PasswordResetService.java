@@ -45,7 +45,7 @@ public class PasswordResetService {
             firestore.collection("PasswordResetTokens").document(token).set(data).get();
 
             //테스트 시 본인 로컬 IP주소로 변경(추후 서버 주소로 변경)
-            String webRedirectLink = "http://172.30.1.36:8080/api/auth/reset-password-redirect?token=" + token;
+            String webRedirectLink = "https://iplanner.site/api/auth/reset-password-redirect?token=" + token;
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 

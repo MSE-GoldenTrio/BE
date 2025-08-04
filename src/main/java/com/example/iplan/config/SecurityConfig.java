@@ -120,7 +120,7 @@ public class SecurityConfig{
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.addAllowedOriginPattern("*"); // 모든 도메인 허용 (보안 고려 필요)
+        configuration.addAllowedOriginPattern("https://iplanner.site"); // 모든 도메인 허용 (보안 고려 필요)
         configuration.addAllowedMethod("*"); // 모든 HTTP 메서드 허용
         configuration.addAllowedHeader("*"); // 모든 헤더 허용
         configuration.setAllowCredentials(true); // 자격 증명 허용 (쿠키, Authorization 헤더 등)
