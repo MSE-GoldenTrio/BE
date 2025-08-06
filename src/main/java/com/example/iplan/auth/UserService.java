@@ -419,7 +419,7 @@ public class UserService {
         String encoded = passwordEncoder.encode(rawPassword);
 
         List<QueryDocumentSnapshot> docs = firestore.collection("User")
-                .whereEqualTo("encryptEmail", encryptEmail)
+                .whereEqualTo("email", encryptEmail)
                 .get()
                 .get()
                 .getDocuments();

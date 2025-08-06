@@ -150,7 +150,8 @@ public class ScreenTimeService {
 
                 String filename = image.getOriginalFilename();
                 if (filename == null || filename.trim().isEmpty()) {
-                    throw new CustomException("파일 이름이 비어 있거나 잘못되었습니다.", HttpStatus.BAD_REQUEST);
+                    log.info("파일 이름이 null 또는 비어 있음. UUID로 대체.");
+                    filename = UUID.randomUUID() + ".jpg";
                 }
 
                 Path tempDir = Files.createTempDirectory("upload");
@@ -225,7 +226,7 @@ public class ScreenTimeService {
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());
                 e.printStackTrace();
-                throw new CustomException("파일 업로드 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
+                throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }else{
             throw new CustomException("설치된 앱 목록이 존재하지 않습니다.", HttpStatus.NOT_FOUND);
@@ -350,6 +351,10 @@ public class ScreenTimeService {
                 }
             }
 
+            if(categories.isEmpty()){
+                log.info("사용자 기기에 추가되지 않은 어플이 있습니다.");
+                throw new CustomException("사진과 사용자 기기의 정보가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
+            }
             result.put(KEY_CATEGORIES, categories);
             return result;
         }catch(Exception e){
