@@ -48,7 +48,7 @@ public class CustomLogoutHandler implements LogoutHandler, LogoutSuccessHandler 
             jwtTokenProvider.destroyToken(token, "logout");
             log.info("토큰 무효화 처리 완료 (Redis Blacklist 등록)");
         } else {
-            throw new CustomException("Authorization 헤더가 없거나 형식이 잘못되었습니다.", HttpStatus.BAD_REQUEST);
+            throw new CustomException("일시적 오류가 발생하였습니다.", "Authorization 헤더가 없거나 형식이 잘못되었습니다.", HttpStatus.BAD_REQUEST);
         }
     }
 

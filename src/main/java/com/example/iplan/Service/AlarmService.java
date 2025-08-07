@@ -1,11 +1,8 @@
 package com.example.iplan.Service;
 
 import com.example.iplan.Domain.Alarm;
-import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.AlarmRepository;
-import com.example.iplan.Repository.PlanChildRepository;
-import com.example.iplan.scheduler.PushSchedulerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -36,7 +33,7 @@ public class AlarmService {
             alarmRepository.saveWithAutoIncrement(alarm);
             log.info("알람 저장 성공: {}", alarm.getId());
         } catch (Exception e) {
-            throw new CustomException("알림 저장 성공에 실패했습니다. Error: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("알림 저장에 실패했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -53,7 +50,7 @@ public class AlarmService {
                 log.info("삭제할 알림이 존재하지 않음: planId = {} / fcmToken = {}", planId, fcmToken);
             }
         } catch (Exception e) {
-            throw new CustomException("알림을 컬렉션에서 삭제에 실패했습니다. Error: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("알림 삭제에 실패했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -74,7 +71,7 @@ public class AlarmService {
                 log.info("삭제할 알림이 존재하지 않음: planId = {}", planId);
             }
         } catch (Exception e) {
-            throw new CustomException("알림을 컬렉션에서 삭제에 실패했습니다. Error: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("알림 삭제에 실패했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

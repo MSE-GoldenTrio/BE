@@ -5,7 +5,6 @@ import com.example.iplan.Domain.ScreenTime;
 import com.example.iplan.Domain.ScreenTimeOCRResult;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.GetScreenTimeOCRRepository;
-import com.example.iplan.Repository.InstalledAppsRepository;
 import com.example.iplan.Repository.SetScreenTimeRepository;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.Users;
@@ -30,7 +29,7 @@ public class ParentScreenTimeService {
         List<String> child_id = getTargetChildID(user_id);
 
         if(!isCollectLinkedID(user_id, child_id))
-            throw new CustomException("child_id 중 올치 않은 계정이 있습니다.", HttpStatus.BAD_REQUEST);
+            throw new CustomException("child_id 중 올치 않은 계정이 있습니다.", null, HttpStatus.BAD_REQUEST);
 
         Map<String, Object> response = new HashMap<>();
 
@@ -62,7 +61,7 @@ public class ParentScreenTimeService {
         List<String> child_id = getTargetChildID(user_id);
 
         if(!isCollectLinkedID(user_id, child_id))
-            throw new CustomException("child_id: "+ child_id + "는 연동된 계정이 아닙니다.", HttpStatus.BAD_REQUEST);
+            throw new CustomException("child_id: "+ child_id + "는 연동된 계정이 아닙니다.", null, HttpStatus.BAD_REQUEST);
 
         Map<String, Object> response = new HashMap<>();
         List<ScreenTime> child_screenTime_list = new ArrayList<>();
@@ -96,14 +95,14 @@ public class ParentScreenTimeService {
         try{
             if(graphData != null){
                 if(!Objects.equals(graphData.getUser_id(), childId)){
-                    throw new CustomException("해당 그래프 데이터에 대한 접근 권한이 없습니다.", HttpStatus.NOT_ACCEPTABLE);
+                    throw new CustomException("해당 그래프 데이터에 대한 접근 권한이 없습니다.", null, HttpStatus.NOT_ACCEPTABLE);
                 }
                 ScreenTimeResultDTO resultDTO = ScreenTimeResultDTO.fromEntity(graphData, aes);
                 response.put("success", true);
                 response.put("entity", resultDTO);
             }
         }catch (Exception e){
-            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         return response;
@@ -117,14 +116,14 @@ public class ParentScreenTimeService {
         try{
             if(screenTime != null){
                 if(!Objects.equals(screenTime.getUser_id(), childId)){
-                    throw new CustomException("해당 스크린타임 시간 데이터에 대한 접근 권한이 없습니다.", HttpStatus.NOT_ACCEPTABLE);
+                    throw new CustomException("해당 스크린타임 시간 데이터에 대한 접근 권한이 없습니다.", null, HttpStatus.NOT_ACCEPTABLE);
                 }
                 screenTime.setUser_id(aes.decrypt(screenTime.getUser_id()));
                 response.put("success", true);
                 response.put("entity", screenTime);
             }
         }catch (Exception e){
-            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         return response;
@@ -145,7 +144,7 @@ public class ParentScreenTimeService {
         List<String> child_id_list = parent != null ? parent.getLinked_id() : null;
 
         if(child_id_list == null){
-            throw new CustomException("해당 부모와 연동된 아이가 존재하지않습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("해당 부모와 연동된 아이가 존재하지않습니다.", null, HttpStatus.NOT_FOUND);
         }
 
         System.out.println("Target Child ID List: " + child_id_list.stream().toString());

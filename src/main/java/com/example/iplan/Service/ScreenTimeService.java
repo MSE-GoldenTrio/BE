@@ -18,7 +18,6 @@ import com.google.cloud.vision.v1.Image;
 import com.google.protobuf.ByteString;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -124,7 +123,7 @@ public class ScreenTimeService {
         InstalledApps savedInstalledApps = installedAppsRepository.findByUserId(user_id);
 
         if(user_id == null){
-            throw new CustomException("유저 상태를 확인해주세요.", HttpStatus.BAD_REQUEST);
+            throw new CustomException("로그인 상태를 확인해주세요.", "유저 아이디가 존재하지 않습니다.", HttpStatus.BAD_REQUEST);
         }
 
         if(installedApps != null){
@@ -145,7 +144,7 @@ public class ScreenTimeService {
             try {
                 // 1. 임시 파일로 저장
                 if (image == null || image.isEmpty()) {
-                    throw new CustomException("업로드된 파일이 없습니다.", HttpStatus.BAD_REQUEST);
+                    throw new CustomException("업로드된 파일이 없습니다.", null, HttpStatus.BAD_REQUEST);
                 }
 
                 String filename = image.getOriginalFilename();
@@ -165,7 +164,7 @@ public class ScreenTimeService {
                     Files.write(filePath, image.getBytes());
                     System.out.println("File written successfully to: " + filePath);
                 } catch (IOException e) {
-                    throw new CustomException("파일 저장 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
+                    throw new CustomException("파일 저장 중 오류 발생", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
                 }
 
                 // 2. 파일 생성 시간 확인(캡쳐 시간 확인)
@@ -212,11 +211,11 @@ public class ScreenTimeService {
                     } catch (Exception e) {
                         DeleteFolderFiles(filePath);
                         log.error("OCR 처리 중 내부 오류 발생", e);
-                        throw new CustomException(e.getMessage(), HttpStatus.BAD_REQUEST);
+                        throw new CustomException("OCR 처리 중 내부 오류 발생", e.toString(), HttpStatus.BAD_REQUEST);
                     }
                 } else {
                     DeleteFolderFiles(filePath);
-                    throw new CustomException("파일 생성 시간이 유효하지 않습니다.", HttpStatus.BAD_REQUEST);
+                    throw new CustomException("오늘 캡쳐된 사진이 아니거나 마감 시간이 지나지 않았습니다.", null, HttpStatus.BAD_REQUEST);
                 }
 
                 // 마지막에 임시 파일 삭제
@@ -226,10 +225,10 @@ public class ScreenTimeService {
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());
                 e.printStackTrace();
-                throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+                throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }else{
-            throw new CustomException("설치된 앱 목록이 존재하지 않습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("일시적 오류가 발생하였습니다.","사용자 설치 앱 목록을 가져오는데에 실패했습니다.", HttpStatus.NOT_FOUND);
         }
     }
 
@@ -243,7 +242,7 @@ public class ScreenTimeService {
                             Files.delete(path);
                             System.out.println("삭제된 파일: " + path);
                         } catch (IOException e) {
-                            throw new CustomException("파일 삭제 중 오류 발생", HttpStatus.BAD_REQUEST);
+                            throw new CustomException("파일 삭제 중 오류 발생", e.toString(), HttpStatus.BAD_REQUEST);
                         }
                     });
             System.out.println("모든 파일 삭제 완료.");
@@ -318,7 +317,7 @@ public class ScreenTimeService {
 
         } catch (Exception e) {
             System.out.println("OCR 처리 중 예외 발생: " + e);
-            throw new CustomException("OCR 처리 중 오류가 발생했습니다.", HttpStatus.BAD_REQUEST);
+            throw new CustomException("OCR 처리 중 오류가 발생했습니다.", e.toString(), HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -353,14 +352,14 @@ public class ScreenTimeService {
 
             if(categories.isEmpty()){
                 log.info("사용자 기기에 추가되지 않은 어플이 있습니다.");
-                throw new CustomException("사진과 사용자 기기의 정보가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
+                throw new CustomException("사진과 사용자 기기의 정보가 일치하지 않습니다. 올바른 사진을 올려주세요.", null, HttpStatus.BAD_REQUEST);
             }
             result.put(KEY_CATEGORIES, categories);
             return result;
         }catch(Exception e){
             System.out.println("Error: " + e.getMessage());
             e.printStackTrace();
-            throw new CustomException("추출된 텍스트 분석(filter)중 오류가 발생하였습니다.", HttpStatus.BAD_REQUEST);
+            throw new CustomException("추출된 텍스트 분석중 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -384,7 +383,7 @@ public class ScreenTimeService {
             }
         } catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
-            throw new CustomException("그래프 분석 중 오류가 발생하였습니다.", HttpStatus.BAD_REQUEST);
+            throw new CustomException("그래프 분석 중 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -399,7 +398,7 @@ public class ScreenTimeService {
         var screenTimeData = setScreenTimeRepository.findByDate(user_id, LocalDate.now().toString());
         System.out.println(LocalDate.now());
         if(screenTimeData == null){
-            throw new CustomException("스크린 타임 시간이 설정되지 않았습니다!", HttpStatus.BAD_REQUEST);
+            throw new CustomException("스크린 타임 시간이 설정되지 않았습니다!", null, HttpStatus.BAD_REQUEST);
         }
 
         String deadLineTime = screenTimeData.getDeadLineTime();
@@ -421,7 +420,7 @@ public class ScreenTimeService {
 
     private String TimeFormatter(Matcher matcher) {
         if (!matcher.matches()) {
-            throw new CustomException("No Match Found", HttpStatus.BAD_REQUEST);
+            throw new CustomException("일시적 오류가 발생하였습니다.", "No Match Found: 그래프 분석 TimeFormatter", HttpStatus.BAD_REQUEST);
         }
 
         LocalTime parseTime = LocalTime.MIDNIGHT;
