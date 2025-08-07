@@ -271,9 +271,31 @@ public class UserController {
 
     }
 
-    @PostMapping("/api/auth/consent/confirm")
-    public ResponseEntity<?> confirmConsent(@RequestParam String token) throws ExecutionException, InterruptedException {
-        return parentsConsentService.confirmParentsConsent(token);
+    @GetMapping("/api/auth/consent/confirm")
+    public ResponseEntity<?> confirmConsent(@RequestParam String token){
+        boolean success = parentsConsentService.confirmParentsConsent(token);
+
+        if (!success) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("<html><body><h2 style='text-align:center; margin-top:30vh;'>❌ 유효하지 않은 동의 요청입니다.</h2></body></html>");
+        }
+
+        String html = """
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>iPlan 동의 완료</title>
+          </head>
+          <body>
+            <h2 style="text-align: center; margin-top: 30vh;">
+              ✅ iPlan(계획 달성 어플) 서비스<br/>
+              자녀 가입에 동의하셨습니다.
+            </h2>
+          </body>
+        </html>
+        """;
+
+        return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
     }
 
     /**
