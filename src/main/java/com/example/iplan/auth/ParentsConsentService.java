@@ -64,7 +64,7 @@ public class ParentsConsentService {
         }
     }
 
-    public ResponseEntity<?> confirmParentsConsent(String token) {
+    public boolean confirmParentsConsent(String token) {
         DocumentReference docRef = firestore.collection("ParentsConsentTokens").document(token);
 
         try{
@@ -78,9 +78,7 @@ public class ParentsConsentService {
 
             docRef.update(updates);
 
-            return ResponseEntity.ok(Map.of(
-                    "message", "보호자 동의가 완료되었습니다."
-            ));
+            return true;
         }catch (Exception e){
             throw new CustomException("일시적 오류가 발생하였습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
