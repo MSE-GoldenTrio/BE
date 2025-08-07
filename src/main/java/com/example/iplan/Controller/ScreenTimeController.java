@@ -5,7 +5,6 @@ import com.example.iplan.Service.ScreenTimeService;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -17,10 +16,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 @Controller
 @Slf4j
@@ -42,7 +39,7 @@ public class ScreenTimeController {
                 ObjectMapper objectMapper = new ObjectMapper();
                 installedApps = objectMapper.readValue(installedAppsJson, new TypeReference<>() {});
             } catch (JsonProcessingException e) {
-                throw new CustomException("앱 목록 파싱 실패", HttpStatus.BAD_REQUEST);
+                throw new CustomException("앱 목록 파싱 실패", e.getMessage(), HttpStatus.BAD_REQUEST);
             }
         }else{
             System.out.println("앱 목록 비었거나 null임: " + installedAppsJson);

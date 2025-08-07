@@ -1,17 +1,12 @@
 package com.example.iplan.Repository;
 
-import com.example.iplan.DTO.FeedbackDTO;
 import com.example.iplan.Domain.Feedback;
-import com.example.iplan.Domain.RewardChild;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.DefaultFirebaseRepository.DefaultFirebaseDBRepository;
-import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
-import com.google.firebase.cloud.FirestoreClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -48,7 +43,7 @@ public class FeedbackRepository extends DefaultFirebaseDBRepository<Feedback> {
     public Feedback findFeedbackByID(String feedbackId) throws ExecutionException, InterruptedException {
         Feedback feedback = findEntityByDocumentId(feedbackId);
         if (feedback == null) {
-            throw new CustomException("해당 ID의 Feedback 문서가 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("일시적 오류가 발생하였습니다.","해당 ID:" + feedbackId + "의 Feedback 문서가 없습니다.", HttpStatus.NOT_FOUND);
         }
         return feedback;
     }

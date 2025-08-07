@@ -45,7 +45,7 @@ public class PasswordResetService {
             firestore.collection("PasswordResetTokens").document(token).set(data).get();
 
             //테스트 시 본인 로컬 IP주소로 변경(추후 서버 주소로 변경)
-            String webRedirectLink = "https://iplanner.site/api/auth/reset-password-redirect?token=" + token;
+            String webRedirectLink = "https://iplanner.site/api/auth/mailsender-redirect?token=" + token;
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
@@ -60,7 +60,7 @@ public class PasswordResetService {
 
         }catch (Exception e){
             System.out.println(e.getMessage());
-            throw new CustomException(e.getMessage(), HttpStatus.BAD_REQUEST);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST);
         }
 
     }
@@ -71,7 +71,7 @@ public class PasswordResetService {
 
         if(!doc.exists()) {
             System.out.println("유효하지 않는 토큰입니다.");
-            throw new CustomException("유효하지 않는 토큰입니다.", HttpStatus.BAD_REQUEST);
+            throw new CustomException("비밀번호 재설정 시간이 만료되었습니다. 다시 시도해주세요.", "비밀번호 재설정 토큰이 존재하지 않습니다.", HttpStatus.BAD_REQUEST);
         }
 
         System.out.println(doc);
@@ -80,7 +80,7 @@ public class PasswordResetService {
         assert expiresAt != null;
         if(expiresAt.toDate().before(new java.util.Date())){
             System.out.println("토큰이 만료되었습니다.");
-            throw new CustomException("토큰이 만료되었습니다.", HttpStatus.REQUEST_TIMEOUT);
+            throw new CustomException("비밀번호 재설정 시간이 만료되었습니다. 다시 시도해주세요.", null, HttpStatus.BAD_REQUEST);
         }
 
         String email = doc.getString("email"); // 암호화된 이메일 그대로 가져오기

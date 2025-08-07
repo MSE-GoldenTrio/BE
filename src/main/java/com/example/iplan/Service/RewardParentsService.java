@@ -1,7 +1,6 @@
 package com.example.iplan.Service;
 
 import com.example.iplan.DTO.RewardChildDTO;
-import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Domain.RewardChild;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.RewardChildRepository;
@@ -51,7 +50,7 @@ public class RewardParentsService {
 
         // 사용자 존재 여부 확인
         Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
-                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다: " + nickname, HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException("보상 불러오기 실패", "사용자 Id:" + nickname +"를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         try {
             List<RewardChildDTO> rewards = rewardChildRepository.findRewardChildDtoByUserId(user.getNickname());
@@ -92,17 +91,17 @@ public class RewardParentsService {
                 // 보상의 user_id와 인증객체 유저와 일치한지 확인
                 if (!Objects.equals(reward.getUser_id(), user.getNickname())) {
                     log.info("reward의 User_id: {}, Child의 닉네임: {}", reward.getUser_id(), user.getNickname());
-                    throw new CustomException("해당 보상에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
+                    throw new CustomException("해당 보상에 대한 접근 권한이 없습니다.", null, HttpStatus.FORBIDDEN);  // 404 에러 반환
                 }
                 reward.setUser_id(aes.decrypt(reward.getUser_id()));
                 reward.setContent(aes.decrypt(reward.getContent()));
 
                 return Map.of("success", true, "message", rewardId + " 보상 반환 성공", "reward", reward);
             } else {
-                throw new CustomException(rewardId + " ID의 보상이 존재하지 않음", HttpStatus.NOT_FOUND);
+                throw new CustomException("보상을 불러오는데 실패하였습니다.", rewardId + " ID의 보상이 존재하지 않음", HttpStatus.NOT_FOUND);
             }
         } catch (Exception e) {
-            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
 
