@@ -271,7 +271,7 @@ public class UserController {
 
     }
 
-    @GetMapping("/api/auth/consent/confirm")
+    @GetMapping("/auth/consent/confirm")
     public ResponseEntity<?> confirmConsent(@RequestParam String token){
         boolean success = parentsConsentService.confirmParentsConsent(token);
 
