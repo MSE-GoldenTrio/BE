@@ -46,7 +46,7 @@ public class PlanChildRepository extends DefaultFirebaseDBRepository<PlanChild> 
     public PlanChild findPlanByID(String planId) throws ExecutionException, InterruptedException {
         PlanChild planChild = findEntityByDocumentId(planId);
         if (planChild == null) {
-            throw new CustomException("계획을 찾지 못했습니다.", "해당 ID: "+ planId +"를 PlanChild 문서에서 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("계획을 찾지 못했습니다.", "해당 ID: "+ planId +"를 PlanChild 문서에서 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
         }
         return planChild;
     }

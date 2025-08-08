@@ -48,12 +48,12 @@ public class AccountParentService {
 
         // 1. 자녀 유저 조회
         Users childUser = userRepository.findByHashValueNickName(childNicknameHash)
-                .orElseThrow(() -> new CustomException("해당 닉네임의 자녀를 찾을 수 없습니다.", null, HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException("해당 닉네임의 자녀를 찾을 수 없습니다.", null, HttpStatus.NOT_FOUND, null));
         String childEncryptedNickname = childUser.getNickname();    // 아이의 암호화된 닉네임
 
         // 2. 자녀인지 확인
         if (childUser.getAuthority() != UserRole.CHILD) {
-            throw new CustomException("입력한 닉네임은 자녀 계정이 아닙니다.", null, HttpStatus.BAD_REQUEST);
+            throw new CustomException("입력한 닉네임은 자녀 계정이 아닙니다.", null, HttpStatus.BAD_REQUEST, null);
         }
 
         // 3. 이미 다른 부모와 연동된 자녀인지 확인
@@ -114,7 +114,7 @@ public class AccountParentService {
                 log.warn("연동 요청을 보낼 아이({})의 FcmToken 이 존재하지 않습니다.", childEncryptedNickname);
             }
         } catch (Exception e) {
-            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
         // 9. 응답 반환
@@ -139,7 +139,7 @@ public class AccountParentService {
                 log.info("암호화된 자녀 닉네임: {}", childEncryptedNickname);
 
                 // 유저가 존재하는지 확인
-                userRepository.findByEncryptedNickname(childEncryptedNickname).orElseThrow(() -> new CustomException("아이 사용자를 찾을 수 없습니다", null, HttpStatus.NOT_FOUND));
+                userRepository.findByEncryptedNickname(childEncryptedNickname).orElseThrow(() -> new CustomException("아이 사용자를 찾을 수 없습니다", null, HttpStatus.NOT_FOUND, null));
 
                 // 복호화된 닉네임 얻기
                 String childDecryptedNickname = aes.decrypt(childEncryptedNickname);

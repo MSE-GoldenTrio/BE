@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -20,7 +19,6 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 
 @Service
 @Slf4j
@@ -60,7 +58,7 @@ public class ParentsConsentService {
             return token;
 
         } catch (Exception e) {
-            throw new CustomException("일시적 오류가 발생하였습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -70,7 +68,7 @@ public class ParentsConsentService {
         try{
             DocumentSnapshot snapshot = docRef.get().get();
             if(!snapshot.exists()){
-                throw new CustomException("보호자 동의 시간이 만료되었습니다. 다시 시도해주세요", "보호자 동의 토큰이 유효하지 않습니다.", HttpStatus.BAD_REQUEST);
+                throw new CustomException("보호자 동의 시간이 만료되었습니다. 다시 시도해주세요", "보호자 동의 토큰이 유효하지 않습니다.", HttpStatus.BAD_REQUEST, null);
             }
             Map<String, Object> updates = new HashMap<>();
             updates.put("consent", true);
@@ -80,7 +78,7 @@ public class ParentsConsentService {
 
             return true;
         }catch (Exception e){
-            throw new CustomException("일시적 오류가 발생하였습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 }

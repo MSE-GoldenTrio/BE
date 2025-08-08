@@ -37,7 +37,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -72,7 +71,7 @@ public class UserService {
         try {
             // 1. 아이디 중복 확인 (닉네임 해시값으로 중복 비교)
             if (nickname != null && userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname)).isPresent()) {
-                throw new CustomException("이미 존재하는 아이디입니다.", null, HttpStatus.NOT_FOUND);
+                throw new CustomException("이미 존재하는 아이디입니다.", null, HttpStatus.NOT_FOUND, null);
             }
 
             // 2. authority Enum 변환
@@ -97,10 +96,12 @@ public class UserService {
             log.info("회원가입 성공");
 
             return "Sign Up Successfully";
-        } catch (ExecutionException | InterruptedException e) {
-            throw new CustomException("일시적 오류가 발생하였습니다.", "Firestore 접근 오류: " + e, HttpStatus.BAD_REQUEST);
+        } catch(CustomException ce){
+            throw ce;
+        } catch(ExecutionException | InterruptedException e) {
+            throw new CustomException("일시적 오류가 발생하였습니다.", "Firestore 접근 오류: " + e, HttpStatus.BAD_REQUEST, e);
         } catch (Exception e) {
-            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -133,7 +134,7 @@ public class UserService {
 
             // 4. 사용자 정보 조회
             Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(user_id))
-                    .orElseThrow(() -> new CustomException("잘못된 아이디입니다.", null, HttpStatus.NOT_FOUND));
+                    .orElseThrow(() -> new CustomException("잘못된 아이디입니다.", null, HttpStatus.NOT_FOUND, null ));
 
             // 5. Firebase 사용자 생성 및 UID 저장
             if (user.getFirebaseAuthUID() == null || user.getFirebaseAuthUID().isBlank()) {
@@ -157,7 +158,7 @@ public class UserService {
                     }
                 } catch (Exception e) {
                     log.error("Firebase 사용자 생성 중 오류", e);
-                    throw new CustomException("로그인 실패", "Firebase 사용자 생성 중 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+                    throw new CustomException("로그인 실패", "Firebase 사용자 생성 중 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR, e);
                 }
             }
 
@@ -190,7 +191,7 @@ public class UserService {
         } catch (CustomException ce) {
             throw ce; // CustomException은 그대로 던짐
         } catch (Exception e) {
-            throw new CustomException("로그인 실패", e.toString(), HttpStatus.UNAUTHORIZED);
+            throw new CustomException("로그인 실패", e.toString(), HttpStatus.UNAUTHORIZED, e);
         }
     }
 
@@ -203,7 +204,7 @@ public class UserService {
     public String withdraw(String accessToken, String fcmToken, String encryptedUserId) throws ExecutionException, InterruptedException {
         String nickname = jwtTokenProvider.getUserNickname(accessToken);
         Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
-                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", null, HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", null, HttpStatus.NOT_FOUND, null));
         String uid = user.getFirebaseAuthUID();
         log.info("계정 탈퇴 사용자 nickname: {}, Firebase uid: {}", nickname, uid);
 
@@ -226,7 +227,7 @@ public class UserService {
                 unlinkSocial(user.getProvider(), user.getProviderAccessToken());
             }catch (Exception e){
                 log.warn("소셜 연동 해제 실패 : {}", e.getMessage());
-                throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST);
+                throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST,e );
             }
             user.setProviderAccessToken(null); // 토큰 사용 후 파기
         }
@@ -249,7 +250,7 @@ public class UserService {
             log.info("Firebase 사용자 삭제 완료: {}", uid);
         } catch (FirebaseAuthException e) {
             log.error("Firebase 사용자 삭제 실패: {}", e.getMessage());
-            throw new CustomException("회원 탈퇴 실패", "Firebase 사용자 삭제 실패: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("회원 탈퇴 실패", "Firebase 사용자 삭제 실패: " + e, HttpStatus.INTERNAL_SERVER_ERROR,e );
         }
 
         log.info("회원 탈퇴 완료: {}", nickname);
@@ -278,7 +279,7 @@ public class UserService {
             }
         }catch(Exception e){
             log.warn("{} 소셜 연동 해제 중 오류 발생: {}", provider, e.getMessage());
-            throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST);
+            throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
 
@@ -433,7 +434,7 @@ public class UserService {
                         .get();
             } catch (InterruptedException | ExecutionException e) {
                 System.out.println("업데이트 실패: " + e.getMessage());
-                throw new CustomException("비밀번호 변경 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+                throw new CustomException("비밀번호 변경 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
         }
 
@@ -516,11 +517,11 @@ public class UserService {
                     log.warn("연동 요청을 보낼 유저({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(encryptedLinkedId));
                 }
             }catch (Exception e){
-                throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+                throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
 
         }catch (Exception e){
-            throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.BAD_REQUEST);
+            throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
 
@@ -538,7 +539,7 @@ public class UserService {
             return new CustomOAuth2UserDetails(user);
         } catch (Exception e) {
             log.error("loadUserByEncryptedNickname 오류: {}", e.getMessage());
-            throw new CustomException("사용자 정보 불러오기 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("사용자 정보 불러오기 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
