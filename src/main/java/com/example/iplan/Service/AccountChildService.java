@@ -46,12 +46,12 @@ public class AccountChildService {
         // 1. DTO에서 받아온 요청 ID로 PendingAccountRequest 조회 (부모가 요청 보낼 때 PendingAccountRequest 저장)
         PendingAccountRequest request = accountRepository.findEntityByDocumentId(dto.getId());
         if (request == null) {
-            throw new CustomException("일시적 오류가 발생하였습니다.","해당 요청:"+dto.getId()+"이 존재하지 않습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("일시적 오류가 발생하였습니다.","해당 요청:"+dto.getId()+"이 존재하지 않습니다.", HttpStatus.NOT_FOUND, null);
         }
 
         // 2. (암호화된) 아이 닉네임 비교
         if (!request.getChildEncryptedNickname().equals(childEncryptedNickname)) {
-            throw new CustomException("본인의 요청만 처리할 수 있습니다.", null, HttpStatus.FORBIDDEN);
+            throw new CustomException("본인의 요청만 처리할 수 있습니다.", null, HttpStatus.FORBIDDEN, null);
         }
         log.info("아이의 암호화된 닉네임: {}", childEncryptedNickname);
 
@@ -63,7 +63,7 @@ public class AccountChildService {
         Users childUser = userRepository.findByEncryptedNickname(childEncryptedNickname).orElseThrow(() -> new IllegalArgumentException("해당 아이 유저가 존재하지 않습니다."));
         Users parentUser = userRepository.findByEncryptedNickname(parentEncryptedNickname).orElseThrow(() -> new IllegalArgumentException("해당 부모 유저가 존재하지 않습니다."));
         if (childUser == null || parentUser == null) {
-            throw new CustomException("유저 정보를 찾을 수 없습니다.", null, HttpStatus.NOT_FOUND);
+            throw new CustomException("유저 정보를 찾을 수 없습니다.", null, HttpStatus.NOT_FOUND, null);
         }
 
         // 4. 아이의 linked_id가 이미 존재하는데 approved(승인)한 경우 -> 수락 불가(denied)
@@ -73,7 +73,7 @@ public class AccountChildService {
             request.setApproved(false);
             request.setStatus("denied");
             accountRepository.update(request);
-            throw new CustomException("이미 다른 계정과 연동되어 있어 수락할 수 없습니다.", null, HttpStatus.BAD_REQUEST);
+            throw new CustomException("이미 다른 계정과 연동되어 있어 수락할 수 없습니다.", null, HttpStatus.BAD_REQUEST, null);
         }
 
         // 5. 승인하는 경우
@@ -117,7 +117,7 @@ public class AccountChildService {
 
         // 자녀 유저 조회
         Users childUser = userRepository.findByEncryptedNickname(childEncryptedNickname)
-                .orElseThrow(() -> new CustomException("해당 닉네임의 자녀를 찾을 수 없습니다.", null, HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException("해당 닉네임의 자녀를 찾을 수 없습니다.", null, HttpStatus.NOT_FOUND, null));
 
         // 해당 요청 가져오기
         PendingAccountRequest accountRequest = accountRepository.findByRequestId(pendingRequestId);
@@ -165,7 +165,7 @@ public class AccountChildService {
                 log.warn("연동 요청을 보낼 아이({})의 FcmToken 이 존재하지 않습니다.", childEncryptedNickname);
             }
         } catch (Exception e) {
-            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
         // 응답 반환

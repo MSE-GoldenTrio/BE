@@ -156,7 +156,7 @@ public class UserController {
 
         String roleStr = requestBody.get("role");
         if (roleStr == null || (!roleStr.equals("ROLE_CHILD") && !roleStr.equals("ROLE_PARENT"))) {
-            throw new CustomException("사용자 역할이 존재하지 않습니다.", null, HttpStatus.BAD_REQUEST);
+            throw new CustomException("사용자 역할이 존재하지 않습니다.", null, HttpStatus.BAD_REQUEST,null );
         }
 
         // 사용자 역할 업데이트
@@ -187,7 +187,7 @@ public class UserController {
 
     private static Authentication getAuthentication(Users updatedUser) {
         if (updatedUser == null) {
-            throw new CustomException("사용자가 존재하지 않습니다.", null, HttpStatus.NOT_FOUND);
+            throw new CustomException("사용자가 존재하지 않습니다.", null, HttpStatus.NOT_FOUND, null);
         }
 
         // 추가 정보가 반영된 유저로 CustomOAuth2UserDetails 객체 생성
@@ -208,7 +208,7 @@ public class UserController {
     public ResponseEntity<?> changePassword(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails) {
         if (userDetails == null) {
             System.out.println("인증 사용자 정보가 존재하지 않습니다.");
-            throw new CustomException("인증 정보가 유효하지 않습니다. 다시 로그인 해주세요.", null, HttpStatus.BAD_REQUEST);
+            throw new CustomException("인증 정보가 유효하지 않습니다. 다시 로그인 해주세요.", null, HttpStatus.BAD_REQUEST, null);
         }
 
         try {
@@ -218,7 +218,7 @@ public class UserController {
             return ResponseEntity.ok(Map.of("message", "이메일 전송에 성공했습니다."));
         } catch (Exception e) {
             System.out.println("예외 발생: " + e.getMessage());
-            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
 
@@ -245,7 +245,7 @@ public class UserController {
                     "message", "메일 전송에 성공하였습니다."
             ));
         }else{
-            throw new CustomException("해당 이메일에 등록된 사용자가 없습니다.", null, HttpStatus.NOT_FOUND);
+            throw new CustomException("해당 이메일에 등록된 사용자가 없습니다.", null, HttpStatus.NOT_FOUND, null);
         }
     }
 
@@ -263,10 +263,10 @@ public class UserController {
                         "message", "보호자 동의 메일을 성공적으로 보냈습니다."
                 ));
             }else{
-                throw new CustomException("이메일을 입력해주세요.", null, HttpStatus.BAD_REQUEST);
+                throw new CustomException("이메일을 입력해주세요.", null, HttpStatus.BAD_REQUEST, null);
             }
         }catch (Exception e){
-            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
     }
@@ -360,7 +360,7 @@ public class UserController {
                     "message", "연결된 계정 삭제에 성공하였습니다."
             ));
         }else{
-            throw new CustomException("사용자의 이메일을 찾을 수 없습니다.", null, HttpStatus.NOT_FOUND);
+            throw new CustomException("사용자의 이메일을 찾을 수 없습니다.", null, HttpStatus.NOT_FOUND, null);
         }
     }
 

@@ -36,7 +36,7 @@ public class PlanCategoryService {
             planCategoryRepository.saveWithAutoIncrement(planCategory);
         }
         catch (Exception e){
-            throw new CustomException("계획 카테고리 추가에 실패했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("계획 카테고리 추가에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
         response.put("success", true);
@@ -93,14 +93,14 @@ public class PlanCategoryService {
                 planCategoryRepository.update(planCategory);
             }
             catch (Exception e){
-                throw new CustomException("계획 카테고리 수정에 실패했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+                throw new CustomException("계획 카테고리 수정에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
 
             response.put("success", true);
             response.put("message", "계획 카테고리가 정상적으로 수정 되었습니다");
             return new ResponseEntity<>(response, HttpStatus.OK);
         }else{
-            throw new CustomException("해당 카테고리가 존재하지 않습니다.", null, HttpStatus.OK);
+            throw new CustomException("해당 카테고리가 존재하지 않습니다.", null, HttpStatus.OK, null);
         }
     }
 
@@ -119,7 +119,7 @@ public class PlanCategoryService {
             planCategoryRepository.delete(planCategory);
         }
         catch (Exception e){
-            throw new CustomException("계획 카테고리 삭제에 실패했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("계획 카테고리 삭제에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
         response.put("success", true);

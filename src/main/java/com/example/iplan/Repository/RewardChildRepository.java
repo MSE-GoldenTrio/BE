@@ -51,7 +51,7 @@ public class RewardChildRepository extends DefaultFirebaseDBRepository<RewardChi
     public RewardChild findRewardByID(String rewardId) throws ExecutionException, InterruptedException {
         RewardChild rewardChild = findEntityByDocumentId(rewardId);
         if (rewardChild == null) {
-            throw new CustomException("보상을 찾지 못했습니다.", "해당 ID: "+ rewardId +"를 RewardChild 문서에서 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("보상을 찾지 못했습니다.", "해당 ID: "+ rewardId +"를 RewardChild 문서에서 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
         }
         return rewardChild;
     }

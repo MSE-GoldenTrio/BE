@@ -46,7 +46,7 @@ public class FeedbackService {
             // 1. rewardID로 RewardChild 엔티티에서 해당 보상 검색
             RewardChild reward = rewardChildRepository.findEntityByDocumentId(feedbackDTO.getReward_id());
             if (reward == null) {
-                throw new CustomException("피드백 설정에 실패하였습니다.", "해당 Id: "+feedbackDTO.getReward_id()+"를 RewardChild에서 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+                throw new CustomException("피드백 설정에 실패하였습니다.", "해당 Id: "+feedbackDTO.getReward_id()+"를 RewardChild에서 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
             }
 
             String encryptedComment = aes.encrypt(feedbackDTO.getComment());
@@ -77,7 +77,7 @@ public class FeedbackService {
 
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
-            throw new CustomException("저장에 실패했습니다", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("저장에 실패했습니다", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -174,10 +174,10 @@ public class FeedbackService {
             Feedback existingFeedback = feedbackRepository.findByField("reward_id", feedbackDTO.getReward_id());
 
             if (existingFeedback == null) {
-                throw new CustomException("피드백 수정 실패","해당 ID:" + feedbackDTO.getReward_id() +"의 지급된 피드백을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+                throw new CustomException("피드백 수정 실패","해당 ID:" + feedbackDTO.getReward_id() +"의 지급된 피드백을 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
             }
             if (!Objects.equals(existingFeedback.getUser_id(), parentNickname)) {
-                throw new CustomException("해당 피드백에 대한 수정 권한이 없습니다.", null, HttpStatus.UNAUTHORIZED);
+                throw new CustomException("해당 피드백에 대한 수정 권한이 없습니다.", null, HttpStatus.UNAUTHORIZED, null);
             }
 
             // 빌더 패턴을 사용하여 Feedback 객체를 새롭게 업데이트
@@ -198,7 +198,7 @@ public class FeedbackService {
             // 보상 객체도 함께 수정
             RewardChild reward = rewardChildRepository.findEntityByDocumentId(existingFeedback.getReward_id());
             if (reward == null) {
-                throw new CustomException("보상 수정 실패", "해당 ID:" + existingFeedback.getReward_id() +"의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+                throw new CustomException("보상 수정 실패", "해당 ID:" + existingFeedback.getReward_id() +"의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
             }
             reward.setRewarded(true);
             reward.setSuccess(feedbackDTO.isSuccess());
@@ -210,7 +210,7 @@ public class FeedbackService {
             log.info("피드백 수정 완료 id: {}", updateFeedback.getId());
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
-            throw new CustomException("피드백 수정 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("피드백 수정 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -225,17 +225,17 @@ public class FeedbackService {
             if (feedback != null) {
                 // 피드백의 user_id와 인증객체 유저와 일치한지 확인
                 if (!Objects.equals(feedback.getChild_id(), childNickname)) {
-                    throw new CustomException("해당 피드백에 대한 접근 권한이 없습니다.", null, HttpStatus.FORBIDDEN);  // 404 에러 반환
+                    throw new CustomException("해당 피드백에 대한 접근 권한이 없습니다.", null, HttpStatus.FORBIDDEN, null);  // 404 에러 반환
                 }
                 feedback.setUser_id(aes.decrypt(feedback.getUser_id()));
                 feedback.setChild_id(aes.decrypt(feedback.getChild_id()));
                 feedback.setComment(aes.decrypt(feedback.getComment()));
                 return Map.of("success", true, "message", feedbackId + " 피드백 반환 성공", "feedback", feedback);
             } else {
-                throw new CustomException("일시적 오류가 발생하였습니다.",feedbackId + " ID의 피드백이 존재하지 않음", HttpStatus.NOT_FOUND);
+                throw new CustomException("일시적 오류가 발생하였습니다.",feedbackId + " ID의 피드백이 존재하지 않음", HttpStatus.NOT_FOUND, null);
             }
         } catch (Exception e) {
-            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 

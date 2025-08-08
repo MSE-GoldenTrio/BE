@@ -33,7 +33,7 @@ public class AlarmService {
             alarmRepository.saveWithAutoIncrement(alarm);
             log.info("알람 저장 성공: {}", alarm.getId());
         } catch (Exception e) {
-            throw new CustomException("알림 저장에 실패했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("알림 저장에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -50,7 +50,7 @@ public class AlarmService {
                 log.info("삭제할 알림이 존재하지 않음: planId = {} / fcmToken = {}", planId, fcmToken);
             }
         } catch (Exception e) {
-            throw new CustomException("알림 삭제에 실패했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("알림 삭제에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -71,7 +71,7 @@ public class AlarmService {
                 log.info("삭제할 알림이 존재하지 않음: planId = {}", planId);
             }
         } catch (Exception e) {
-            throw new CustomException("알림 삭제에 실패했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("알림 삭제에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 

@@ -219,7 +219,7 @@ public class DefaultFirebaseDBRepository<T> implements FirebaseDBRepository<T, S
         if(documentSnapshot.exists()){
             return documentSnapshot.toObject(entityClass);
         }else{
-            throw new CustomException("일시적 오류가 발생하였습니다.", "데이터(" + collectionName +")에서 ID(" + document_id +") 문서를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("일시적 오류가 발생하였습니다.", "데이터(" + collectionName +")에서 ID(" + document_id +") 문서를 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
         }
     }
 
