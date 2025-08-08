@@ -133,7 +133,7 @@ public class UserService {
 
             // 4. 사용자 정보 조회
             Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(user_id))
-                    .orElseThrow(() -> new CustomException("사용자 찾을 수 없습니다.", null, HttpStatus.NOT_FOUND));
+                    .orElseThrow(() -> new CustomException("잘못된 아이디입니다.", null, HttpStatus.NOT_FOUND));
 
             // 5. Firebase 사용자 생성 및 UID 저장
             if (user.getFirebaseAuthUID() == null || user.getFirebaseAuthUID().isBlank()) {
@@ -187,6 +187,8 @@ public class UserService {
 
             // 11. jwt 반환
             return jwtToken;
+        } catch (CustomException ce) {
+            throw ce; // CustomException은 그대로 던짐
         } catch (Exception e) {
             throw new CustomException("로그인 실패", e.toString(), HttpStatus.UNAUTHORIZED);
         }
