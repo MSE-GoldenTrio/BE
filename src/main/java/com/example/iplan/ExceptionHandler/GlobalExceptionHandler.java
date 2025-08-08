@@ -19,7 +19,7 @@ public class GlobalExceptionHandler {
         response.put("message", ex.getMessage());
 
         if(ex.getDetail() != null) response.put("detail", ex.getDetail());
-        if(ex.getStackTrace() != null) response.put("stackTrace", ex.getStackTrace());
+        if(ex.getStackTraceString() != null) response.put("stackTrace", ex.getStackTraceString());
 
         response.put("timestamp", LocalDateTime.now());
         response.put("status", ex.getStatus());
