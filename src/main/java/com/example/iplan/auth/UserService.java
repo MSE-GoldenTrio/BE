@@ -29,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.*;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.core.Authentication;
@@ -114,86 +115,91 @@ public class UserService {
      */
     public JwtToken signIn(String user_id, String password, String fcmToken) {
         try {
-            // 1. 사용자의 입력값으로 UsernamePasswordAuthenticationToken 생성 -> 비밀번호 검증을 위해 사용됨
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(user_id, password);
+            // 1. 사용자 입력으로 UsernamePasswordAuthenticationToken 생성
+            UsernamePasswordAuthenticationToken authenticationToken =
+                    new UsernamePasswordAuthenticationToken(user_id, password);
             log.info("Passed signIn 1");
 
-            // AuthenticationManager 가 로그인 요청을 처리 (여기서 사용자 인증과 비밀번호 검증이 이루어짐)
-            // 내부적으로 BCryptPasswordEncoder.matches(입력된 비밀번호, 저장된 암호화된 비밀번호)를 실행하여 검증
+            // 2. 사용자 인증 시도
+            Authentication authentication;
+            try {
+                authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+                log.info("Passed signIn 2");
+            } catch (BadCredentialsException e) {
+                // 비밀번호 틀림
+                throw new CustomException("비밀번호가 잘못 입력되었습니다.", null, HttpStatus.UNAUTHORIZED, e);
+            } catch (UsernameNotFoundException e) {
+                // 사용자 존재하지 않음
+                throw new CustomException("존재하지 않는 사용자입니다. 회원가입을 진행해주세요.", null, HttpStatus.NOT_FOUND, e);
+            } catch (Exception e) {
+                // 기타 인증 관련 오류
+                throw new CustomException("로그인 인증 과정에서 오류가 발생했습니다.", e.getMessage(), HttpStatus.UNAUTHORIZED, e);
+            }
 
-            // 2. AuthenticationManager.authenticate()가 호출됨
-            // 2-1. 여기서 AuthenticationManager 가 CustomUserDetailsService.loadUserByUsername()을 내부적으로 호출
-            // -> 디비에서 해당 이메일을 가진 사용자 조회 후 CustomUserDetails 객체 반환
-            // 2-2. 이후 AuthenticationManager 가 CustomUserDetails 객체와 위에서 생성한 UsernamePasswordAuthenticationToken 울 바교하여 사용자 인증을 알아서 해줌
-            // 2-3. 검증 완료되면 CustomUserDetails 객체를 인증 객체 (Authentication)로 변환하여 인증 완료
-            Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
-            log.info("Passed signIn 2");
-
-            // 3. 사용자 인증 이후 Authentication 객체를 SecurityContextHolder 에 저장
+            // 3. 인증 성공 시 SecurityContext 에 저장
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // 4. 사용자 정보 조회
+            // 4. 사용자 정보 조회 (닉네임 해시 기준)
             Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(user_id))
-                    .orElseThrow(() -> new CustomException("잘못된 아이디입니다.", null, HttpStatus.NOT_FOUND, null ));
+                    .orElseThrow(() -> new CustomException("잘못된 아이디입니다.", null, HttpStatus.NOT_FOUND, null));
 
-            // 5. Firebase 사용자 생성 및 UID 저장
+            // 5. Firebase 사용자 UID 등록
             if (user.getFirebaseAuthUID() == null || user.getFirebaseAuthUID().isBlank()) {
-                UserRecord userRecord;
                 try {
+                    UserRecord userRecord;
                     try {
-                        // 이메일로 이미 존재하는지 확인
                         userRecord = FirebaseAuth.getInstance().getUserByEmail(aes.decrypt(user.getEmail()));
-                        log.info("기존 Firebase Authentication 사용자: {}", userRecord.getUid());
+                        log.info("기존 Firebase 사용자: {}", userRecord.getUid());
                     } catch (Exception e) {
-                        // 존재하지 않으면 새로 생성 (UID 자등오르 랜덤 생성됨)
                         UserRecord.CreateRequest createRequest = new UserRecord.CreateRequest()
                                 .setEmail(aes.decrypt(user.getEmail()))
                                 .setDisplayName(aes.decrypt(user.getName()));
                         userRecord = FirebaseAuth.getInstance().createUser(createRequest);
-                        log.info("새 Firebase Authentication 사용자 생성됨: {}", userRecord.getUid());
+                        log.info("새 Firebase 사용자 생성됨: {}", userRecord.getUid());
 
-                        // Users 업데이트
                         user.setFirebaseAuthUID(userRecord.getUid());
                         userRepository.update(user);
                     }
                 } catch (Exception e) {
                     log.error("Firebase 사용자 생성 중 오류", e);
-                    throw new CustomException("로그인 실패", "Firebase 사용자 생성 중 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR, e);
+                    throw new CustomException("Firebase 사용자 생성 중 오류", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, e);
                 }
             }
 
-            // 6. UID 포함한 사용자 정보로 Authentication 객체 다시 생성
+            // 6. UID 포함한 Authentication 객체 다시 설정
             CustomOAuth2UserDetails updatedUserDetails = new CustomOAuth2UserDetails(user);
-            Authentication updatedAuth = new UsernamePasswordAuthenticationToken(updatedUserDetails, null, updatedUserDetails.getAuthorities());
+            Authentication updatedAuth = new UsernamePasswordAuthenticationToken(
+                    updatedUserDetails, null, updatedUserDetails.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(updatedAuth);
 
-            // 7. fcmToken 디비에 업데이트
-            fcmTokenService.save(user.getNicknameHash(), fcmToken); // 해시된 user_id로 업데이트
+            // 7. fcmToken 저장
+            fcmTokenService.save(user.getNicknameHash(), fcmToken);
 
-            // 5. 새 디바이스에 푸시 예약 복구
-            saveFutureAlarm(user.getNickname(), fcmToken); // 암호화된 user_id로 해야함
+            // 8. 푸시 알람 예약 복구
+            saveFutureAlarm(user.getNickname(), fcmToken);
 
-            // 9. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
+            // 9. JWT 생성
             JwtToken jwtToken = jwtTokenProvider.generateToken(updatedAuth);
-            log.info("JwtToken created: accessToken = {}, refreshToken = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
+            log.info("JWT 생성 완료: access = {}, refresh = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
 
-            // 10. Refresh 토큰 Redis 에 저장
-            long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
+            // 10. Refresh 토큰 Redis 저장
+            long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60;
             refreshTokenService.saveToken(
                     (CustomOAuth2UserDetails) authentication.getPrincipal(),
                     jwtToken.getRefreshToken(),
                     expirationMinutes
             );
-            log.info("Saved refresh token in Redis: user_id={}, ttl={}min", user_id, expirationMinutes);
+            log.info("Refresh 토큰 저장 완료: user_id={}, TTL={}min", user_id, expirationMinutes);
 
-            // 11. jwt 반환
             return jwtToken;
+
         } catch (CustomException ce) {
-            throw ce; // CustomException은 그대로 던짐
+            throw ce;
         } catch (Exception e) {
-            throw new CustomException("로그인 실패", e.toString(), HttpStatus.UNAUTHORIZED, e);
+            throw new CustomException("로그인 중 알 수 없는 오류가 발생했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
+
 
     /**
      * 계정 탈퇴
