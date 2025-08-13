@@ -219,15 +219,7 @@ public class UserService {
             fcmTokenService.deleteToken(user.getNicknameHash(), fcmToken);
         }
 
-        // 1. 토큰 무효화
-        jwtTokenProvider.destroyToken(accessToken, "withdraw");
-
-        // 2. 연동 해제
-        for (String linkedId : user.getLinked_id()) {
-            deleteLinkedId(user.getEmail(), linkedId);
-        }
-
-        // 3. 소셜 연동 해제
+        // 2. 소셜 연동 해제
         if(user.getProvider() != null && user.getProviderAccessToken() != null){
             try{
                 unlinkSocial(user.getProvider(), user.getProviderAccessToken());
@@ -238,11 +230,16 @@ public class UserService {
             user.setProviderAccessToken(null); // 토큰 사용 후 파기
         }
 
-        // 4. 관련 데이터 삭제 (계획, 보상, 피드백)
+        // 3. 관련 데이터 삭제 (계획, 보상, 피드백)
         planChildRepository.deleteAllByUserId(encryptedUserId);
         rewardChildRepository.deleteAllByUserId(encryptedUserId);
         feedbackRepository.deleteAllByUserId(encryptedUserId);
         log.info("관련 데이터 삭제 완료");
+
+        // 4. 연동 해제
+        for (String linkedId : user.getLinked_id()) {
+            deleteOpponentLinkedId(user.getEmail(), linkedId);
+        }
 
         // 5. 유저 삭제
         userRepository.delete(user);
@@ -258,6 +255,9 @@ public class UserService {
             log.error("Firebase 사용자 삭제 실패: {}", e.getMessage());
             throw new CustomException("회원 탈퇴 실패", "Firebase 사용자 삭제 실패: " + e, HttpStatus.INTERNAL_SERVER_ERROR,e );
         }
+
+        // 제일 마지막에 ! 토큰 무효화
+        jwtTokenProvider.destroyToken(accessToken, "withdraw");
 
         log.info("회원 탈퇴 완료: {}", nickname);
         return "Delete User Successfully";
@@ -500,6 +500,59 @@ public class UserService {
             List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(DigestUtils.sha256Hex(aes.decrypt(encryptedLinkedId)));
 
             log.info("연동 해제하는 상대의 nickname {}", aes.decrypt(encryptedLinkedId));
+            try{
+                if(!fcmTokens.isEmpty()){
+                    for(FcmToken fcmToken : fcmTokens){
+                        FcmRequestDTO requestDto = FcmRequestDTO.builder()
+                                .user_id(fcmToken.getUser_id())
+                                .fcmToken(fcmToken.getToken())
+                                .notification(FcmRequestDTO.Notification.builder()
+                                        .title("iPlan")
+                                        .body(aes.decrypt(request_user.getNickname()) + "과(와)의 연동이 해제되었습니다.")
+                                        .build())
+                                .data(FcmRequestDTO.Data.builder()
+                                        .pendingRequestId(null)
+                                        .sender(aes.decrypt(request_user.getNickname()))
+                                        .type("DeleteLinkedId")
+                                        .build())
+                                .build();
+                        fcmRequestService.sendPush(requestDto);
+                        log.info("연동 해제 알람을 성공적으로 보냈습니다.");
+                    }
+                }else{
+                    log.warn("연동 요청을 보낼 유저({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(encryptedLinkedId));
+                }
+            }catch (Exception e){
+                throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
+            }
+
+        }catch (Exception e){
+            throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
+        }
+    }
+
+    public void deleteOpponentLinkedId(String encryptedEmail, String encryptedLinkedId){
+        log.info("입력된 encryptedEmail: {}", encryptedEmail);
+        log.info("입력된 encryptedLinkedId: {}", encryptedLinkedId);
+
+        try{
+            // 1. 계정 연동 해제를 요청한(혹은 계정 탈퇴하는) 유저 조회
+            Users request_user = findByEncryptedEmail(encryptedEmail);
+            log.info("연동을 해제를 요청하는 유저의 닉네임: {}", aes.decrypt(request_user.getNickname()));
+
+            // 2. (requestUser 와 연동된) linked_id 에 해당하는 유저 조회
+            Users linked_user = findByEncryptedNickname(encryptedLinkedId);
+
+            List<String> linked_user_linked_id = linked_user.getLinked_id();
+            linked_user_linked_id.remove(request_user.getNickname());
+            linked_user.setLinked_id(linked_user_linked_id);
+
+            userRepository.update(linked_user);
+            log.info("상대의 연동 아이디 리스트에서 내(탈퇴한) 계정 삭제 완료");
+
+            // 연동 해제 되었다는 알림을 보낼 상대의 FcmToken찾기
+            List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(DigestUtils.sha256Hex(aes.decrypt(encryptedLinkedId)));
+
             try{
                 if(!fcmTokens.isEmpty()){
                     for(FcmToken fcmToken : fcmTokens){
