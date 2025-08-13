@@ -127,7 +127,7 @@ public class UserService {
                 log.info("Passed signIn 2");
             } catch (BadCredentialsException e) {
                 // 비밀번호 틀림
-                throw new CustomException("비밀번호가 잘못 입력되었습니다.", null, HttpStatus.UNAUTHORIZED, e);
+                throw new CustomException("아이디 또는 비밀번호가 잘못 입력되었습니다.", null, HttpStatus.UNAUTHORIZED, e);
             } catch (UsernameNotFoundException e) {
                 // 사용자 존재하지 않음
                 throw new CustomException("존재하지 않는 사용자입니다. 회원가입을 진행해주세요.", null, HttpStatus.NOT_FOUND, e);

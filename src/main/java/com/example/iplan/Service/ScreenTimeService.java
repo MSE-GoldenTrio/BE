@@ -118,7 +118,7 @@ public class ScreenTimeService {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    public ResponseEntity<Map<String, Object>> uploadScreenTimeImage(@RequestParam("file") MultipartFile image, String user_id, List<String> installedApps) throws Exception {
+    public ResponseEntity<Map<String, Object>> uploadScreenTimeImage(MultipartFile image, String user_id, List<String> installedApps) throws Exception {
         Map<String, Object> response = new HashMap<>();
         InstalledApps savedInstalledApps = installedAppsRepository.findByUserId(user_id);
 
