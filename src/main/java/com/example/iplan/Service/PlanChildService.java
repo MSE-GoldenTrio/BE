@@ -101,7 +101,7 @@ public class PlanChildService {
             //response = dayDataService.GenerateOrSaveDayPlanData(response, planPost, user_id);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } else {
-            throw new CustomException("유저 아이디가 올바르지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("유저 아이디가 올바르지 않습니다.", null, HttpStatus.INTERNAL_SERVER_ERROR, null);
         }
     }
 
@@ -117,11 +117,11 @@ public class PlanChildService {
 
         if(existingPlan == null){
             log.info("계획이 존재하지 않아 수정 불가");
-            throw new CustomException("해당 Id의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("계획 수정 실패", "해당 ID: "+ planChildDTO.getId() +"가 PlanChild 문서에 없습니다.", HttpStatus.NOT_FOUND, null);
         }
         if(!Objects.equals(existingPlan.getUser_id(), user_id)) {
             log.info("계획 수정 권한이 없음");
-            throw new CustomException("해당 계획에 대한 수정 권한이 없습니다.", HttpStatus.UNAUTHORIZED);
+            throw new CustomException("계획 수정 실패", "해당 계획에 대한 수정 권한이 없습니다.", HttpStatus.UNAUTHORIZED, null);
         }
 
         // 1. 계획 업데이트
@@ -145,7 +145,7 @@ public class PlanChildService {
             log.info("계획 업데이트 성공!!");
         }
         catch (Exception e){
-            throw new CustomException("계획 업데이트에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("계획 업데이트에 실패했습니다", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR,e );
         }
 
         // 2. 알림 설정에 따른 푸시 예약 처리
@@ -205,7 +205,7 @@ public class PlanChildService {
                 }
             }
         }catch(Exception e){
-            throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
         return planDtoList;
@@ -252,7 +252,7 @@ public class PlanChildService {
             PlanChild plan = planChildRepository.findEntityByDocumentId(document_id);
 
             if (plan == null)
-                throw new CustomException("해당 Id의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
+                throw new CustomException("계획 삭제 실패", "해당 ID: "+ document_id +"가 PlanChild 문서에 없습니다.", HttpStatus.NOT_FOUND, null);
 
             // 만약 알림 설정이 되어있는 계획이라면 예약된 푸시 알림 취소 + Alarm 컬렉션에서 삭제
             if (plan.isAlarm() && plan.getPlan_start_time() != null) {
@@ -268,7 +268,7 @@ public class PlanChildService {
             log.info("계획 삭제 완료: {}", plan.getId());
         }
         catch (Exception e){
-            throw new CustomException("계획 삭제에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("계획 삭제 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
         response.put("success", true);
@@ -296,7 +296,7 @@ public class PlanChildService {
             setScreenTimeRepository.saveWithAutoIncrement(newScreenTime);
         }
         catch(Exception e){
-            throw new CustomException("스크린 타임 설정에 실패했습니다. Error: "+ e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("스크린 타임 설정에 실패했습니다", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
         response.put("success", true);

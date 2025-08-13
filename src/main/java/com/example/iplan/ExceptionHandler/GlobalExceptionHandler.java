@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,6 +17,12 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
         response.put("message", ex.getMessage());
+
+        if(ex.getDetail() != null) response.put("detail", ex.getDetail());
+        if(ex.getStackTraceString() != null) response.put("stackTrace", ex.getStackTraceString());
+
+        response.put("timestamp", LocalDateTime.now());
+        response.put("status", ex.getStatus());
 
         return new ResponseEntity<>(response, ex.getStatus());
     }

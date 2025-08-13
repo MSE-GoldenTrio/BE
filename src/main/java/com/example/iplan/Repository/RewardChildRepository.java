@@ -1,6 +1,5 @@
 package com.example.iplan.Repository;
 
-import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Domain.RewardChild;
 import com.example.iplan.DTO.RewardChildDTO;
 import com.example.iplan.ExceptionHandler.CustomException;
@@ -10,7 +9,6 @@ import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.cloud.firestore.QuerySnapshot;
-import com.google.firebase.cloud.FirestoreClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
@@ -50,10 +48,10 @@ public class RewardChildRepository extends DefaultFirebaseDBRepository<RewardChi
     /**
      * Reward ID로 해당하는 문서 반환
      */
-    public RewardChild findRewardByID(String planId) throws ExecutionException, InterruptedException {
-        RewardChild rewardChild = findEntityByDocumentId(planId);
+    public RewardChild findRewardByID(String rewardId) throws ExecutionException, InterruptedException {
+        RewardChild rewardChild = findEntityByDocumentId(rewardId);
         if (rewardChild == null) {
-            throw new CustomException("해당 ID의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("보상을 찾지 못했습니다.", "해당 ID: "+ rewardId +"를 RewardChild 문서에서 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
         }
         return rewardChild;
     }

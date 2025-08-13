@@ -8,9 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -49,7 +46,7 @@ public class PlanChildRepository extends DefaultFirebaseDBRepository<PlanChild> 
     public PlanChild findPlanByID(String planId) throws ExecutionException, InterruptedException {
         PlanChild planChild = findEntityByDocumentId(planId);
         if (planChild == null) {
-            throw new CustomException("해당 ID의 PlanChild 문서가 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("계획을 찾지 못했습니다.", "해당 ID: "+ planId +"를 PlanChild 문서에서 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
         }
         return planChild;
     }

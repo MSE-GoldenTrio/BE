@@ -1,7 +1,6 @@
 package com.example.iplan.Service;
 
 import com.example.iplan.DTO.RewardChildDTO;
-import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Domain.RewardChild;
 import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.RewardChildRepository;
@@ -62,7 +61,7 @@ public class RewardChildService {
             response.put("id", reward.getId());
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
-            throw new CustomException("보상 저장에 실패했습니다. Error: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("보상 저장에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -78,14 +77,14 @@ public class RewardChildService {
                 // 보상의 user_id와 인증객체 유저와 일치한지 확인
                 log.info("아이쪽 단일 보상 조회 user_id : " + reward.getUser_id() + ", 요청 사용자 아이디: " + childNickname);
                 if (!Objects.equals(reward.getUser_id(), childNickname)) {
-                    throw new CustomException("해당 보상에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
+                    throw new CustomException("해당 보상에 대한 접근 권한이 없습니다.", null, HttpStatus.FORBIDDEN, null);  // 404 에러 반환
                 }
                 return Map.of("success", true, "message", rewardId + " 보상 반환 성공", "reward", reward);
             } else {
-                throw new CustomException(rewardId + " ID의 보상이 존재하지 않음", HttpStatus.NOT_FOUND);
+                throw new CustomException("일시적 오류가 발생하였습니다.",rewardId + " ID의 보상이 존재하지 않음", HttpStatus.NOT_FOUND, null);
             }
         } catch (Exception e) {
-            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -134,7 +133,13 @@ public class RewardChildService {
     public List<RewardChildDTO> getAllRewards(String nickname) throws Exception {
         // 사용자가 존재하는지 확인
         Users user = userRepository.findByEncryptedNickname(nickname)
-                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> {
+                    try {
+                        return new CustomException("일시적 오류가 발생하였습니다.", "user id: " + aes.decrypt(nickname) +"사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
+                    } catch (Exception e) {
+                        throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR,e );
+                    }
+                });
         log.info("Get all rewards start!!");
         try {
             // 사용자의 모든 보상을 가져오기
@@ -172,12 +177,12 @@ public class RewardChildService {
             // 해당 ID의 보상을 조회
             RewardChild reward = rewardChildRepository.findEntityByDocumentId(documentID);
             if (reward == null) {
-                throw new CustomException("해당 ID의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+                throw new CustomException("보상 삭제 실패","해당 ID: "+ documentID +"의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
             }
 
             // 보상이 이미 지급된 경우 (is_rewarded 가 true) 삭제를 허용하지 않음
             if (reward.isRewarded()) {
-                throw new CustomException("해당 보상은 이미 지급되어 삭제할 수 없습니다.", HttpStatus.FORBIDDEN);
+                throw new CustomException("해당 보상은 이미 지급되어 삭제할 수 없습니다.", null, HttpStatus.FORBIDDEN, null);
             }
 
             // 지급되지 않은 보상만 삭제 허용
@@ -187,7 +192,7 @@ public class RewardChildService {
             response.put("message", "보상이 정상적으로 삭제되었습니다.");
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
-            throw new CustomException("보상 삭제에 실패했습니다. Error: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("보상 삭제에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -205,7 +210,7 @@ public class RewardChildService {
         RewardChild existingReward = rewardChildRepository.findEntityByDocumentId(rewardDto.getId());
 
         if (existingReward == null) {
-            throw new CustomException("해당 ID의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            throw new CustomException("보상 수정 실패","해당 ID:" +rewardDto.getId()+ "의 보상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
         }
 
         // 날짜 문자열에서 yyyy-MM-dd만 추출
@@ -224,7 +229,7 @@ public class RewardChildService {
         // 만약 해당 날짜의 보상이 이미 지급된 상태라면 수정 금지
         if (rewardChildOnSameDay != null && rewardChildOnSameDay.isRewarded()) {
             log.info("Error: reward is already rewarded");
-            throw new CustomException("해당 날짜의 보상이 이미 지급되어 수정할 수 없습니다.", HttpStatus.FORBIDDEN);
+            throw new CustomException("해당 날짜의 보상이 이미 지급되어 수정할 수 없습니다.", null, HttpStatus.FORBIDDEN, null);
         }
 
         RewardChild updatedReward = RewardChild.builder()
@@ -244,7 +249,7 @@ public class RewardChildService {
             log.info("Reward updated successfully!!");
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
-            throw new CustomException("보상 수정에 실패했습니다. Error: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("보상 수정 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 

@@ -83,17 +83,17 @@ public class PlanParentService {
             if (plan != null) {
                 // 계획의 user_id와 일치한지 확인
                 if (!Objects.equals(plan.getUser_id(), childNickname)) {
-                    throw new CustomException("해당 계획에 대한 접근 권한이 없습니다.", HttpStatus.FORBIDDEN);  // 404 에러 반환
+                    throw new CustomException("해당 계획에 대한 접근 권한이 없습니다.", null, HttpStatus.FORBIDDEN, null);  // 404 에러 반환
                 }
                 plan.setTitle(aes.decrypt(plan.getTitle()));
                 plan.setMemo(aes.decrypt(plan.getMemo()));
                 plan.setUser_id(aes.decrypt(plan.getUser_id()));
                 return Map.of("success", true, "message", planId + " 계획 반환 성공", "plan", plan);
             } else {
-                throw new CustomException(planId + " ID의 계획이 존재하지 않음", HttpStatus.NOT_FOUND);
+                throw new CustomException("계획 불러오기 실패", planId + " ID의 계획이 존재하지 않음", HttpStatus.NOT_FOUND, null);
             }
         } catch (Exception e) {
-            throw new CustomException("서버 오류 발생: " + e, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
 

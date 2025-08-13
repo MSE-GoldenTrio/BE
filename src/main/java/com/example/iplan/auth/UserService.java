@@ -18,7 +18,6 @@ import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.redis.RefreshTokenService;
 import com.example.iplan.util.AES256Encryptor;
 import com.example.iplan.scheduler.PushSchedulerService;
-import com.google.api.Http;
 import com.google.api.client.util.Value;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
@@ -30,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.*;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.core.Authentication;
@@ -38,7 +38,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -73,7 +72,7 @@ public class UserService {
         try {
             // 1. 아이디 중복 확인 (닉네임 해시값으로 중복 비교)
             if (nickname != null && userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname)).isPresent()) {
-                throw new CustomException("Nickname already exists.", HttpStatus.NOT_FOUND);
+                throw new CustomException("이미 존재하는 아이디입니다.", null, HttpStatus.NOT_FOUND, null);
             }
 
             // 2. authority Enum 변환
@@ -98,10 +97,12 @@ public class UserService {
             log.info("회원가입 성공");
 
             return "Sign Up Successfully";
-        } catch (ExecutionException | InterruptedException e) {
-            throw new CustomException("Error accessing Firestore: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch(CustomException ce){
+            throw ce;
+        } catch(ExecutionException | InterruptedException e) {
+            throw new CustomException("일시적 오류가 발생하였습니다.", "Firestore 접근 오류: " + e, HttpStatus.BAD_REQUEST, e);
         } catch (Exception e) {
-            throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
@@ -114,8 +115,9 @@ public class UserService {
      */
     public JwtToken signIn(String user_id, String password, String fcmToken) {
         try {
-            // 1. 사용자의 입력값으로 UsernamePasswordAuthenticationToken 생성 -> 비밀번호 검증을 위해 사용됨
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(user_id, password);
+            // 1. 사용자 입력으로 UsernamePasswordAuthenticationToken 생성
+            UsernamePasswordAuthenticationToken authenticationToken =
+                    new UsernamePasswordAuthenticationToken(user_id, password);
             log.info("Passed signIn 1");
 
             // AuthenticationManager 가 로그인 요청을 처리 (여기서 사용자 인증과 비밀번호 검증이 이루어짐)
@@ -126,20 +128,32 @@ public class UserService {
             // -> 디비에서 해당 이메일을 가진 사용자 조회 후 CustomUserDetails 객체 반환
             // 2-2. 이후 AuthenticationManager 가 CustomUserDetails 객체와 위에서 생성한 UsernamePasswordAuthenticationToken 울 바교하여 사용자 인증을 알아서 해줌
             // 2-3. 검증 완료되면 CustomUserDetails 객체를 인증 객체 (Authentication)로 변환하여 인증 완료
-            Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
-            log.info("Passed signIn 2");
+            Authentication authentication;
+            try {
+                authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+                log.info("Passed signIn 2");
+            } catch (BadCredentialsException e) {
+                // 비밀번호 틀림
+                throw new CustomException("아이디 또는 비밀번호가 잘못 입력되었습니다.", null, HttpStatus.UNAUTHORIZED, e);
+            } catch (UsernameNotFoundException e) {
+                // 사용자 존재하지 않음
+                throw new CustomException("존재하지 않는 사용자입니다. 회원가입을 진행해주세요.", null, HttpStatus.NOT_FOUND, e);
+            } catch (Exception e) {
+                // 기타 인증 관련 오류
+                throw new CustomException("로그인 인증 과정에서 오류가 발생했습니다.", e.getMessage(), HttpStatus.UNAUTHORIZED, e);
+            }
 
-            // 3. 사용자 인증 이후 Authentication 객체를 SecurityContextHolder 에 저장
+            // 3. 인증 성공 시 SecurityContext 에 저장
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // 4. 사용자 정보 조회
+            // 4. 사용자 정보 조회 (닉네임 해시 기준)
             Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(user_id))
-                    .orElseThrow(() -> new CustomException("사용자 없음", HttpStatus.NOT_FOUND));
+                    .orElseThrow(() -> new CustomException("잘못된 아이디입니다.", null, HttpStatus.NOT_FOUND, null));
 
             // 5. Firebase 사용자 생성 및 UID 저장
             if (user.getFirebaseAuthUID() == null || user.getFirebaseAuthUID().isBlank()) {
-                UserRecord userRecord;
                 try {
+                    UserRecord userRecord;
                     try {
                         // 이메일로 이미 존재하는지 확인
                         userRecord = FirebaseAuth.getInstance().getUserByEmail(aes.decrypt(user.getEmail()));
@@ -158,7 +172,7 @@ public class UserService {
                     }
                 } catch (Exception e) {
                     log.error("Firebase 사용자 생성 중 오류", e);
-                    throw new CustomException("Firebase 사용자 등록 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
+                    throw new CustomException("Firebase 사용자 생성 중 오류", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, e);
                 }
             }
 
@@ -175,7 +189,7 @@ public class UserService {
 
             // 9. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
             JwtToken jwtToken = jwtTokenProvider.generateToken(updatedAuth);
-            log.info("JwtToken created: accessToken = {}, refreshToken = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
+            log.info("JWT 생성 완료: access = {}, refresh = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
 
             // 10. Refresh 토큰 Redis 에 저장
             long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
@@ -184,14 +198,18 @@ public class UserService {
                     jwtToken.getRefreshToken(),
                     expirationMinutes
             );
-            log.info("Saved refresh token in Redis: user_id={}, ttl={}min", user_id, expirationMinutes);
+            log.info("Refresh 토큰 저장 완료: user_id={}, TTL={}min", user_id, expirationMinutes);
 
             // 11. jwt 반환
             return jwtToken;
+
+        } catch (CustomException ce) {
+            throw ce;
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
+            throw new CustomException("로그인 중 알 수 없는 오류가 발생했습니다.", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
+
 
     /**
      * 계정 탈퇴
@@ -202,7 +220,7 @@ public class UserService {
     public String withdraw(String accessToken, String fcmToken, String encryptedUserId) throws ExecutionException, InterruptedException {
         String nickname = jwtTokenProvider.getUserNickname(accessToken);
         Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
-                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", null, HttpStatus.NOT_FOUND, null));
         String uid = user.getFirebaseAuthUID();
         log.info("계정 탈퇴 사용자 nickname: {}, Firebase uid: {}", nickname, uid);
 
@@ -225,7 +243,7 @@ public class UserService {
                 unlinkSocial(user.getProvider(), user.getProviderAccessToken());
             }catch (Exception e){
                 log.warn("소셜 연동 해제 실패 : {}", e.getMessage());
-                throw new CustomException("소셜 연동 해제 실패", HttpStatus.BAD_REQUEST);
+                throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST,e );
             }
             user.setProviderAccessToken(null); // 토큰 사용 후 파기
         }
@@ -248,7 +266,7 @@ public class UserService {
             log.info("Firebase 사용자 삭제 완료: {}", uid);
         } catch (FirebaseAuthException e) {
             log.error("Firebase 사용자 삭제 실패: {}", e.getMessage());
-            throw new CustomException("Firebase 사용자 삭제 실패", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("회원 탈퇴 실패", "Firebase 사용자 삭제 실패: " + e, HttpStatus.INTERNAL_SERVER_ERROR,e );
         }
 
         log.info("회원 탈퇴 완료: {}", nickname);
@@ -277,7 +295,7 @@ public class UserService {
             }
         }catch(Exception e){
             log.warn("{} 소셜 연동 해제 중 오류 발생: {}", provider, e.getMessage());
-            throw new CustomException("소셜 연동 해제 중 오류 발생", HttpStatus.BAD_REQUEST);
+            throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
 
@@ -419,7 +437,7 @@ public class UserService {
         String encoded = passwordEncoder.encode(rawPassword);
 
         List<QueryDocumentSnapshot> docs = firestore.collection("User")
-                .whereEqualTo("encryptEmail", encryptEmail)
+                .whereEqualTo("email", encryptEmail)
                 .get()
                 .get()
                 .getDocuments();
@@ -432,7 +450,7 @@ public class UserService {
                         .get();
             } catch (InterruptedException | ExecutionException e) {
                 System.out.println("업데이트 실패: " + e.getMessage());
-                throw new CustomException("비밀번호 변경 실패", HttpStatus.INTERNAL_SERVER_ERROR);
+                throw new CustomException("비밀번호 변경 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
         }
 
@@ -515,11 +533,11 @@ public class UserService {
                     log.warn("연동 요청을 보낼 유저({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(encryptedLinkedId));
                 }
             }catch (Exception e){
-                throw new CustomException(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+                throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
 
         }catch (Exception e){
-            throw new CustomException("연동 아이디 제거 중 오류 발생: "+ e.getMessage(), HttpStatus.BAD_REQUEST);
+            throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
 
@@ -537,7 +555,7 @@ public class UserService {
             return new CustomOAuth2UserDetails(user);
         } catch (Exception e) {
             log.error("loadUserByEncryptedNickname 오류: {}", e.getMessage());
-            throw new CustomException("사용자 정보를 불러오는 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new CustomException("사용자 정보 불러오기 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
