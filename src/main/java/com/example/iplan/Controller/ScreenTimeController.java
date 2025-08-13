@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -27,8 +28,8 @@ public class ScreenTimeController {
 
     private final ScreenTimeService screenTimeService;
 
-    @PostMapping("/upload")
-    public ResponseEntity<Map<String, Object>> uploadScreenTimeFile(@RequestParam("image")MultipartFile image, @AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam(value = "installed_apps", required = false) String installedAppsJson) throws Exception {
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> uploadScreenTimeFile(@RequestParam("file")MultipartFile image, @AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam(value = "installed_apps", required = false) String installedAppsJson) throws Exception {
         String childNickname = user.getUsername();
         log.info("스크린타임 사진 업로드 유저: " + childNickname);
 
