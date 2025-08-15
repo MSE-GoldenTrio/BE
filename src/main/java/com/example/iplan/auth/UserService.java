@@ -7,6 +7,10 @@ import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.RewardChildRepository;
 import com.example.iplan.Service.AlarmService;
 import com.example.iplan.Service.PlanChildService;
+import com.example.iplan.auth.oauth2.DTO.KakaoTokenResponse;
+import com.example.iplan.auth.oauth2.DTO.NaverTokenResponse;
+import com.example.iplan.auth.oauth2.SocialClientService;
+import com.example.iplan.auth.redis.OAuth2ProviderTokenService;
 import com.example.iplan.fcm.FcmRequestDTO;
 import com.example.iplan.fcm.FcmRequestService;
 import com.example.iplan.fcm.FcmToken;
@@ -64,6 +68,9 @@ public class UserService {
     private final AlarmService alarmService;
     private final PushSchedulerService pushSchedulerService;
     private final FcmRequestService fcmRequestService;
+
+    private final OAuth2ProviderTokenService providerTokenService;
+    private final SocialClientService socialClientService;
 
     private final AES256Encryptor aes;
 
@@ -203,16 +210,19 @@ public class UserService {
 
     /**
      * 계정 탈퇴
-     * @param accessToken
-     * @param fcmToken
-     * @param encryptedUserId
      */
     public String withdraw(String accessToken, String fcmToken, String encryptedUserId) throws ExecutionException, InterruptedException {
-        String nickname = jwtTokenProvider.getUserNickname(accessToken);
-        Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
+
+        Users user = userRepository.findByEncryptedNickname(encryptedUserId)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", null, HttpStatus.NOT_FOUND, null));
+
+        String provider = user.getProvider();
+        String subject = user.getEmailHash();
+
+        String p_access = providerTokenService.getAccessToken(provider, subject).orElse(null);
+        String p_refresh = providerTokenService.getRefreshToken(provider, subject).orElse(null);
+
         String uid = user.getFirebaseAuthUID();
-        log.info("계정 탈퇴 사용자 nickname: {}, Firebase uid: {}", nickname, uid);
 
         // 1. FCM 토큰 삭제
         if (fcmToken != null && !fcmToken.isBlank()) {
@@ -220,14 +230,52 @@ public class UserService {
         }
 
         // 2. 소셜 연동 해제
-        if(user.getProvider() != null && user.getProviderAccessToken() != null){
+        if(provider != null) {
             try{
-                unlinkSocial(user.getProvider(), user.getProviderAccessToken());
-            }catch (Exception e){
-                log.warn("소셜 연동 해제 실패 : {}", e.getMessage());
-                throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST,e );
+                //unlinkSocial(user.getProvider(), user.getProviderAccessToken());
+                switch (provider){
+                    case "google" -> {
+                        // 구글은 refreshToken이 있으면 그걸로 바로 함
+                        String revokeToken = (p_refresh != null) ? p_refresh : p_access;
+                        if(revokeToken != null){
+                            socialClientService.unlinkGoogle(revokeToken);
+                        } else{
+                            log.warn("Google unlink: no token found. Skip remote revoke.");
+                        }
+                    }
+                    case "kakao" -> {
+                        if(p_access != null){
+                            socialClientService.unlinkKakaoByAccess(p_access);
+                        } else if(p_refresh != null){
+                            KakaoTokenResponse t = socialClientService.reissueKakaoToken(p_refresh);
+
+                            if(t.getAccessToken() != null){
+                                socialClientService.unlinkKakaoByAccess(t.getAccessToken());
+                            } else {
+                                log.warn("Kakao unlink: cannot reissue access. Skip remote revoke.");
+                            }
+                        } else {
+                            log.warn("Kakao unlink: no token. Skip remote revoke.");
+                        }
+                    }
+                    case "naver" -> {
+                        if(p_access == null && p_refresh != null){
+                            NaverTokenResponse t = socialClientService.reissueNaverToken(p_refresh);
+                            p_access = t.getAccessToken();
+                        }
+                        if(p_access != null){
+                            boolean ok = socialClientService.unlinkNaver(p_access);
+                            if(!ok) log.warn("네이버 연동 해제 실패");
+                        } else {
+                            log.warn("Naver unlink: no token available. Skip remote revoke.");
+                        }
+                    }
+                    default -> log.warn("알 수 없는 provider: {}", provider);
+                }
+            } finally {
+                // 로컬 정리 (항상)
+                providerTokenService.deleteAll(provider, subject);
             }
-            user.setProviderAccessToken(null); // 토큰 사용 후 파기
         }
 
         // 3. 관련 데이터 삭제 (계획, 보상, 피드백)
@@ -259,93 +307,8 @@ public class UserService {
         // 제일 마지막에 ! 토큰 무효화
         jwtTokenProvider.destroyToken(accessToken, "withdraw");
 
-        log.info("회원 탈퇴 완료: {}", nickname);
         return "Delete User Successfully";
     }
-
-    public void unlinkSocial(String provider, String providerAccessToken){
-        if(providerAccessToken == null || providerAccessToken.isBlank()){
-            log.warn("소셜 연동 해제 생략: 토큰 없음");
-            return;
-        }
-
-        try{
-            switch (provider.toUpperCase()){
-                case "KAKAO":
-                    unlinkKakao(providerAccessToken);
-                    break;
-                case "NAVER":
-                    unlinkNaver(providerAccessToken);
-                    break;
-                case "GOOGLE":
-                    unlinkGoogle(providerAccessToken);
-                    break;
-                default:
-                    log.warn("지원하지 않는 소셜 provider입니다: {}", provider);
-            }
-        }catch(Exception e){
-            log.warn("{} 소셜 연동 해제 중 오류 발생: {}", provider, e.getMessage());
-            throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
-        }
-    }
-
-    private void unlinkKakao(String accessToken){
-        String url = "https://kapi.kakao.com/v1/user/unlink";
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + accessToken);
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-        ResponseEntity<String> response = new RestTemplate().postForEntity(url, entity, String.class);
-
-        if(response.getStatusCode().is2xxSuccessful()){
-            log.info("카카오 연동 해제 성공");
-        }else{
-            log.warn("카카오 연도오 해제 실패 또는 이미 해제됨: {}", response.getBody());
-        }
-    }
-    private void unlinkGoogle(String accessToken) {
-        String url = "https://oauth2.googleapis.com/revoke?token=" + accessToken;
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-        ResponseEntity<String> response = new RestTemplate().postForEntity(url, entity, String.class);
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            log.info("구글 연동 해제 성공");
-        } else {
-            log.warn("구글 연동 해제 실패 또는 이미 해제됨: {}", response.getBody());
-        }
-    }
-
-    @Value("${spring.security.oauth2.client.registration.naver.client-id}")
-    private String naverClientId;
-
-    @Value("${spring.security.oauth2.client.registration.naver.client-secret}")
-    private String naverClientSecret;
-
-    private void unlinkNaver(String accessToken) {
-        String url = "https://nid.naver.com/oauth2.0/token" +
-                "?grant_type=delete" +
-                "&client_id=" + naverClientId +
-                "&client_secret=" + naverClientSecret +
-                "&access_token=" + accessToken +
-                "&service_provider=NAVER";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-        ResponseEntity<String> response = new RestTemplate().postForEntity(url, entity, String.class);
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            log.info("네이버 연동 해제 성공");
-        } else {
-            log.warn("네이버 연동 해제 실패 또는 이미 해제됨: {}", response.getBody());
-        }
-    }
-
 
     /**
      * 닉네임을 기반으로 사용자 조회
