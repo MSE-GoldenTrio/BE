@@ -264,7 +264,9 @@ public class UserController {
             }else{
                 throw new CustomException("이메일을 입력해주세요.", null, HttpStatus.BAD_REQUEST, null);
             }
-        }catch (Exception e){
+        } catch(CustomException ce){
+            throw ce;
+        } catch (Exception e){
             throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 

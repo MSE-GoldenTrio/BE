@@ -211,7 +211,7 @@ public class ScreenTimeService {
                     } catch (Exception e) {
                         DeleteFolderFiles(filePath);
                         log.error("OCR 처리 중 내부 오류 발생", e);
-                        throw new CustomException("OCR 처리 중 내부 오류 발생", e.toString(), HttpStatus.BAD_REQUEST, e);
+                        throw new CustomException(e.getMessage(), e.toString(), HttpStatus.BAD_REQUEST, e);
                     }
                 } else {
                     DeleteFolderFiles(filePath);
@@ -222,10 +222,11 @@ public class ScreenTimeService {
                 DeleteFolderFiles(filePath);
                 return new ResponseEntity<>(response, HttpStatus.OK);
 
+            } catch(CustomException ce){
+                throw ce;
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());
-                e.printStackTrace();
-                throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
+                throw new CustomException(e.getMessage(), e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
         }else{
             throw new CustomException("일시적 오류가 발생하였습니다.","사용자 설치 앱 목록을 가져오는데에 실패했습니다.", HttpStatus.NOT_FOUND,null );
@@ -315,9 +316,11 @@ public class ScreenTimeService {
             sortedTexts.forEach(t -> System.out.println("text: " + t));
             return sortedTexts;
 
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             System.out.println("OCR 처리 중 예외 발생: " + e);
-            throw new CustomException("OCR 처리 중 오류가 발생했습니다.", e.toString(), HttpStatus.BAD_REQUEST, e);
+            throw new CustomException(e.getMessage(), e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
 
@@ -356,10 +359,11 @@ public class ScreenTimeService {
             }
             result.put(KEY_CATEGORIES, categories);
             return result;
-        }catch(Exception e){
+        } catch(CustomException ce){
+            throw ce;
+        } catch(Exception e){
             System.out.println("Error: " + e.getMessage());
-            e.printStackTrace();
-            throw new CustomException("추출된 텍스트 분석중 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST, e);
+            throw new CustomException(e.getMessage(), e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
 
@@ -381,6 +385,8 @@ public class ScreenTimeService {
                 category.put("name", text);
                 categories.add(category);
             }
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
             throw new CustomException("그래프 분석 중 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST, e);

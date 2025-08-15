@@ -1,5 +1,6 @@
 package com.example.iplan.auth.jwt;
 
+import com.example.iplan.ExceptionHandler.CustomException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
@@ -61,6 +62,8 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
             SecurityContextHolder.clearContext();
             // AuthenticationEntryPoint 직접 호출
             authenticationEntryPoint.commence(httpRequest, httpResponse, ex);
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

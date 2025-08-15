@@ -76,6 +76,8 @@ public class FeedbackService {
             log.info("피드백 저장 완료 id: {}", newFeedback.getId());
 
             return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new CustomException("저장에 실패했습니다", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
@@ -106,6 +108,8 @@ public class FeedbackService {
             }
 
             return ResponseEntity.ok(response);
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             log.error("Error of {}: {}", encryptedParentNickname, e.getMessage());
             throw new ExecutionException("보상 목록을 가져오는 중 오류가 발생했습니다.", e);
@@ -152,6 +156,8 @@ public class FeedbackService {
             return response;
         } catch (InterruptedException e) {
             throw new InterruptedException("서버 오류");
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new ExecutionException("피드백 조회에 실패했습니다. Error: " + e.getMessage(), e);
         }

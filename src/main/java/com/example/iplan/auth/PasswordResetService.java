@@ -58,7 +58,9 @@ public class PasswordResetService {
 
             mailSender.send(mimeMessage);
 
-        }catch (Exception e){
+        } catch(CustomException ce){
+            throw ce;
+        } catch (Exception e){
             System.out.println(e.getMessage());
             throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST, e);
         }

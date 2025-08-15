@@ -1,5 +1,6 @@
 package com.example.iplan.auth.oauth2;
 
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.UserService;
 import com.example.iplan.auth.Users;
@@ -87,6 +88,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 userRepository.update(user);
                 log.info("UID 업데이트 성공: {}", userRecord.getUid());
             }
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             log.error("Firebase 사용자 생성 중 오류", e);
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Firebase 사용자 등록 중 오류 발생");

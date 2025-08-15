@@ -167,6 +167,8 @@ public class UserService {
                         user.setFirebaseAuthUID(userRecord.getUid());
                         userRepository.update(user);
                     }
+                } catch(CustomException ce){
+                    throw ce;
                 } catch (Exception e) {
                     log.error("Firebase 사용자 생성 중 오류", e);
                     throw new CustomException("Firebase 사용자 생성 중 오류", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, e);
@@ -485,11 +487,15 @@ public class UserService {
                 }else{
                     log.warn("연동 요청을 보낼 유저({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(encryptedLinkedId));
                 }
-            }catch (Exception e){
+            } catch(CustomException ce){
+                throw ce;
+            } catch (Exception e){
                 throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
 
-        }catch (Exception e){
+        } catch(CustomException ce){
+            throw ce;
+        } catch (Exception e){
             throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
@@ -538,11 +544,15 @@ public class UserService {
                 }else{
                     log.warn("연동 요청을 보낼 유저({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(encryptedLinkedId));
                 }
-            }catch (Exception e){
+            } catch(CustomException ce){
+                throw ce;
+            } catch (Exception e){
                 throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
 
-        }catch (Exception e){
+        } catch(CustomException ce){
+            throw ce;
+        } catch (Exception e){
             throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
@@ -559,6 +569,8 @@ public class UserService {
 
             Users user = optionalUser.get();
             return new CustomOAuth2UserDetails(user);
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             log.error("loadUserByEncryptedNickname 오류: {}", e.getMessage());
             throw new CustomException("사용자 정보 불러오기 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
