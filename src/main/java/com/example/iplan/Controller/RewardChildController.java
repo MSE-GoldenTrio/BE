@@ -2,6 +2,7 @@ package com.example.iplan.Controller;
 
 import com.example.iplan.DTO.RewardChildDTO;
 import com.example.iplan.Domain.RewardChild;
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Service.RewardChildService;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.google.firebase.database.annotations.NotNull;
@@ -129,6 +130,8 @@ public class RewardChildController {
             response.put("success", false);
             response.put("message", "보상 목록을 가져오는 데 실패했습니다. Error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

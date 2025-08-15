@@ -72,9 +72,11 @@ public class RewardParentsService {
 
             return response;
 
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             log.error("Error while getting rewards for {}: {}", nickname, e.getMessage());
-            throw new ExecutionException("보상 조회 중 오류 발생", e);
+            throw new ExecutionException("보상 조회 중 오류 발생: " + e.getMessage(), e);
         }
     }
 
@@ -100,6 +102,8 @@ public class RewardParentsService {
             } else {
                 throw new CustomException("보상을 불러오는데 실패하였습니다.", rewardId + " ID의 보상이 존재하지 않음", HttpStatus.NOT_FOUND,null );
             }
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR,e );
         }

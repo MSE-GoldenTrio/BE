@@ -1,5 +1,6 @@
 package com.example.iplan.auth.oauth2;
 
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.auth.UserRepository;
 import com.example.iplan.auth.UserRole;
 import com.example.iplan.auth.Users;
@@ -121,6 +122,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         } catch (OAuth2AuthenticationException e) {
             // 이미 래핑된 예외면 그대로 throw
             throw e;
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             log.error("saveOrUpdate 내부 오류", e);
             // 모든 일반 예외를 OAuth2AuthenticationException으로 감싸기

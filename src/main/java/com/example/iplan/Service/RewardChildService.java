@@ -60,6 +60,8 @@ public class RewardChildService {
             response.put("message", "보상이 정상적으로 저장되었습니다.");
             response.put("id", reward.getId());
             return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new CustomException("보상 저장에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
@@ -83,6 +85,8 @@ public class RewardChildService {
             } else {
                 throw new CustomException("일시적 오류가 발생하였습니다.",rewardId + " ID의 보상이 존재하지 않음", HttpStatus.NOT_FOUND, null);
             }
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
@@ -136,6 +140,8 @@ public class RewardChildService {
                 .orElseThrow(() -> {
                     try {
                         return new CustomException("일시적 오류가 발생하였습니다.", "user id: " + aes.decrypt(nickname) +"사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND, null);
+                    } catch(CustomException ce){
+                        throw ce;
                     } catch (Exception e) {
                         throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR,e );
                     }
@@ -157,6 +163,8 @@ public class RewardChildService {
             }
 
             return rewards;
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             log.error("Error of {}(복호화 됨): {}", aes.decrypt(nickname), e.getMessage());
             throw new ExecutionException("보상 목록을 가져오는 중 오류가 발생했습니다.", e);
@@ -191,6 +199,8 @@ public class RewardChildService {
             response.put("success", true);
             response.put("message", "보상이 정상적으로 삭제되었습니다.");
             return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new CustomException("보상 삭제에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
@@ -248,6 +258,8 @@ public class RewardChildService {
             response.put("message", "보상이 정상적으로 수정되었습니다.");
             log.info("Reward updated successfully!!");
             return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new CustomException("보상 수정 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }

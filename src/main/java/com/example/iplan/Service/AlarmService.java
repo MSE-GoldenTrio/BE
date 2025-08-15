@@ -70,6 +70,8 @@ public class AlarmService {
             } else {
                 log.info("삭제할 알림이 존재하지 않음: planId = {}", planId);
             }
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new CustomException("알림 삭제에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }

@@ -2,6 +2,7 @@ package com.example.iplan.scheduler;
 
 import com.example.iplan.Domain.Alarm;
 import com.example.iplan.Domain.PlanChild;
+import com.example.iplan.ExceptionHandler.CustomException;
 import com.example.iplan.Repository.AlarmRepository;
 import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Service.PlanChildService;
@@ -41,6 +42,8 @@ public class AlarmInitializer implements ApplicationListener<ApplicationReadyEve
                 }
             }
 
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             log.error("알람 복구 실패: {}", e.getMessage());
         }

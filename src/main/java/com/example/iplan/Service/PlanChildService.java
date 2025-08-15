@@ -267,7 +267,9 @@ public class PlanChildService {
             planChildRepository.delete(plan);
             log.info("계획 삭제 완료: {}", plan.getId());
         }
-        catch (Exception e){
+        catch(CustomException ce){
+            throw ce;
+        } catch (Exception e){
             throw new CustomException("계획 삭제 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
