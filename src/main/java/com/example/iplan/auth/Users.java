@@ -51,9 +51,6 @@ public class Users {
     @Schema(description = "어떤 소셜 플랫폼인지에 대한 정보", example = "google")
     private String provider;
 
-    @Schema(description = "소셜 플랫폼에서 받은 access token")
-    private String providerAccessToken;
-
     @Schema(description = "Firebase Auth가 생성한 UID (실시간 데이터 변경 감지를 위해)")
     private String firebaseAuthUID;
 }

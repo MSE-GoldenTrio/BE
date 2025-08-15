@@ -4,6 +4,7 @@ import com.example.iplan.auth.CustomLogoutHandler;
 import com.example.iplan.auth.ExceptionHandler.CustomAccessDeniedHandler;
 import com.example.iplan.auth.ExceptionHandler.CustomAuthenticationEntryPoint;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserService;
+import com.example.iplan.auth.oauth2.GoogleRefreshTokenRequestResolver;
 import com.example.iplan.auth.oauth2.OAuth2FailureHandler;
 import com.example.iplan.auth.oauth2.OAuth2SuccessHandler;
 import com.example.iplan.auth.jwt.JwtAuthenticationFilter;
@@ -26,6 +27,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 
 @Slf4j
 @Configuration
@@ -40,9 +42,15 @@ public class SecurityConfig{
     private final CustomLogoutHandler customLogoutHandler;
     private final CustomAccessDeniedHandler customAccessDeniedHandler;
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    private final ClientRegistrationRepository clientRegistrationRepository;
+    private static final String OAUTH2_AUTHORIZATION_BASE_URI = "/oauth2/authorization";
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
+
+        var googleResolver = new GoogleRefreshTokenRequestResolver(
+                clientRegistrationRepository, OAUTH2_AUTHORIZATION_BASE_URI
+        );
 
         http
                 // 기본 설정인 Session 방식을 사용하지 않고 JWT를 사용하기 위해 STATELESS로 처리
@@ -83,6 +91,7 @@ public class SecurityConfig{
                 .oauth2Login(oauth2 -> oauth2
                         .authorizationEndpoint(auth -> auth
                                 .baseUri("/oauth2/authorization") // 프론트에서 OAuth2 인증 요청 URL 설정
+                                .authorizationRequestResolver(googleResolver)
                         )
                         .redirectionEndpoint(redir -> redir
                                 .baseUri("/login/oauth2/code/*") // 카카오, 구글, 네이버에서 로그인 성공 후 백엔드로 인가 코드를 포함하여 보낼 리디렉션 URL 설정
