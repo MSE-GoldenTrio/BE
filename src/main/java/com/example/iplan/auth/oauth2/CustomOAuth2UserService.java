@@ -47,7 +47,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         OAuth2User oAuth2User = super.loadUser(userRequest);
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
-        String oAuth2AccessToken = userRequest.getAccessToken().getTokenValue();
 
         // 플랫폼별 사용자 정보 매핑
         // OAuth2UserInfo.of()를 호출하여 표준화된 사용자 정보로 변환
@@ -63,7 +62,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
 
         // 사용자 저장 또는 업데이트 -> user 설정(반환)
-        saveOrUpdate(oAuth2UserInfo, registrationId, oAuth2AccessToken);
+        saveOrUpdate(oAuth2UserInfo, registrationId);
         if (user == null) {
             throw new OAuth2AuthenticationException(
                     new OAuth2Error("user_null", "OAuth2 로그인 중 사용자 정보가 정상적으로 저장되지 않았습니다.", null)
@@ -76,14 +75,13 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     /**
      * 디비에서 사용자 정보를 조회하고, 없으면 새로 저장
      */
-    private void saveOrUpdate(OAuth2UserInfo oAuth2UserInfo, String provider, String providerAccessToken) {
+    private void saveOrUpdate(OAuth2UserInfo oAuth2UserInfo, String provider) {
         try {
             Optional<Users> existingUser = userRepository.findByHashValueEmail(DigestUtils.sha256Hex(oAuth2UserInfo.getEmail()));
             if (existingUser.isPresent()) {
                 // 1. 기존 회원이 로그인하는 경우
                 user = existingUser.get();
                 user.setProvider(provider);
-                user.setProviderAccessToken(providerAccessToken);
                 userRepository.update(user);
 
                 // 일반 로그인 사용자라면 소셜 로그인 거부 -> 비밀번호가 null 이 아님
@@ -114,7 +112,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         .linked_id(new ArrayList<>())
                         .firebaseAuthUID("") // OAuth2SuccessHandler 에서 저장
                         .provider(provider)
-                        .providerAccessToken(providerAccessToken)
                         .build();
                 userRepository.saveWithAutoIncrement(user);
 
