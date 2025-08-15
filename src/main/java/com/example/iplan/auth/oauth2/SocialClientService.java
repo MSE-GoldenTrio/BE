@@ -36,9 +36,6 @@ public class SocialClientService {
     @Value("${spring.security.oauth2.client.registration.kakao.client-secret:}")
     private String kakaoClientSecret;
 
-    @Value("${kakao.admin-key}")
-    private String kakaoAdminKey;
-
     @Value("${spring.security.oauth2.client.registration.naver.client-id}")
     private String naverClientId;
 
@@ -102,7 +99,7 @@ public class SocialClientService {
      * @param kakaoUserId
      * @return
      */
-    public Long unlinkKakaoByAdmin(long kakaoUserId) {
+/*    public Long unlinkKakaoByAdmin(long kakaoUserId) {
         var form = new LinkedMultiValueMap<String,String>();
         form.add("target_id_type", "user_id");
         form.add("target_id", String.valueOf(kakaoUserId));
@@ -116,7 +113,7 @@ public class SocialClientService {
             log.warn("Kakao unlink(Admin) 실패: status={}, body={}", e.status(), e.contentUTF8());
             return null;
         }
-    }
+    }*/
 
     /**
      * Kakao 연결 해제 요청
