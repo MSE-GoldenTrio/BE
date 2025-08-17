@@ -127,7 +127,14 @@ public class UserService {
                     new UsernamePasswordAuthenticationToken(user_id, password);
             log.info("Passed signIn 1");
 
-            // 2. 사용자 인증 시도
+            // AuthenticationManager 가 로그인 요청을 처리 (여기서 사용자 인증과 비밀번호 검증이 이루어짐)
+            // 내부적으로 BCryptPasswordEncoder.matches(입력된 비밀번호, 저장된 암호화된 비밀번호)를 실행하여 검증
+
+            // 2. AuthenticationManager.authenticate()가 호출됨
+            // 2-1. 여기서 AuthenticationManager 가 CustomUserDetailsService.loadUserByUsername()을 내부적으로 호출
+            // -> 디비에서 해당 이메일을 가진 사용자 조회 후 CustomUserDetails 객체 반환
+            // 2-2. 이후 AuthenticationManager 가 CustomUserDetails 객체와 위에서 생성한 UsernamePasswordAuthenticationToken 울 바교하여 사용자 인증을 알아서 해줌
+            // 2-3. 검증 완료되면 CustomUserDetails 객체를 인증 객체 (Authentication)로 변환하여 인증 완료
             Authentication authentication;
             try {
                 authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
@@ -150,20 +157,23 @@ public class UserService {
             Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(user_id))
                     .orElseThrow(() -> new CustomException("잘못된 아이디입니다.", null, HttpStatus.NOT_FOUND, null));
 
-            // 5. Firebase 사용자 UID 등록
+            // 5. Firebase 사용자 생성 및 UID 저장
             if (user.getFirebaseAuthUID() == null || user.getFirebaseAuthUID().isBlank()) {
                 try {
                     UserRecord userRecord;
                     try {
+                        // 이메일로 이미 존재하는지 확인
                         userRecord = FirebaseAuth.getInstance().getUserByEmail(aes.decrypt(user.getEmail()));
-                        log.info("기존 Firebase 사용자: {}", userRecord.getUid());
+                        log.info("기존 Firebase Authentication 사용자: {}", userRecord.getUid());
                     } catch (Exception e) {
+                        // 존재하지 않으면 새로 생성 (UID 자등오르 랜덤 생성됨)
                         UserRecord.CreateRequest createRequest = new UserRecord.CreateRequest()
                                 .setEmail(aes.decrypt(user.getEmail()))
                                 .setDisplayName(aes.decrypt(user.getName()));
                         userRecord = FirebaseAuth.getInstance().createUser(createRequest);
-                        log.info("새 Firebase 사용자 생성됨: {}", userRecord.getUid());
+                        log.info("새 Firebase Authentication 사용자 생성됨: {}", userRecord.getUid());
 
+                        // Users 업데이트
                         user.setFirebaseAuthUID(userRecord.getUid());
                         userRepository.update(user);
                     }
@@ -175,24 +185,23 @@ public class UserService {
                 }
             }
 
-            // 6. UID 포함한 Authentication 객체 다시 설정
+            // 6. UID 포함한 사용자 정보로 Authentication 객체 다시 생성
             CustomOAuth2UserDetails updatedUserDetails = new CustomOAuth2UserDetails(user);
-            Authentication updatedAuth = new UsernamePasswordAuthenticationToken(
-                    updatedUserDetails, null, updatedUserDetails.getAuthorities());
+            Authentication updatedAuth = new UsernamePasswordAuthenticationToken(updatedUserDetails, null, updatedUserDetails.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(updatedAuth);
 
-            // 7. fcmToken 저장
-            fcmTokenService.save(user.getNicknameHash(), fcmToken);
+            // 7. fcmToken 디비에 업데이트
+            fcmTokenService.save(user.getNicknameHash(), fcmToken); // 해시된 user_id로 업데이트
 
-            // 8. 푸시 알람 예약 복구
-            saveFutureAlarm(user.getNickname(), fcmToken);
+            // 5. 새 디바이스에 푸시 예약 복구
+            saveFutureAlarm(user.getNickname(), fcmToken); // 암호화된 user_id로 해야함
 
-            // 9. JWT 생성
+            // 9. 인증 객체 (Authentication)을 바탕으로 JWT 토큰 생성
             JwtToken jwtToken = jwtTokenProvider.generateToken(updatedAuth);
             log.info("JWT 생성 완료: access = {}, refresh = {}", jwtToken.getAccessToken(), jwtToken.getRefreshToken());
 
-            // 10. Refresh 토큰 Redis 저장
-            long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60;
+            // 10. Refresh 토큰 Redis 에 저장
+            long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
             refreshTokenService.saveToken(
                     (CustomOAuth2UserDetails) authentication.getPrincipal(),
                     jwtToken.getRefreshToken(),
@@ -200,6 +209,7 @@ public class UserService {
             );
             log.info("Refresh 토큰 저장 완료: user_id={}, TTL={}min", user_id, expirationMinutes);
 
+            // 11. jwt 반환
             return jwtToken;
 
         } catch (CustomException ce) {
