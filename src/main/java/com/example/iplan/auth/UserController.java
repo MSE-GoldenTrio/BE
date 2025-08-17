@@ -10,6 +10,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import com.example.iplan.util.AES256Encryptor;
+import org.apache.commons.codec.digest.DigestUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -109,7 +110,7 @@ public class UserController {
     public ResponseEntity<Map<String, Boolean>> checkEmail(@RequestBody Map<String, String> request) {
         String email = request.get("email");
         log.info("Request email = {}", email);
-        boolean isAvailable = userService.isEmailAvailable(email);
+        boolean isAvailable = userService.isEmailAvailable(DigestUtils.sha256Hex(email));
         return ResponseEntity.ok(Map.of("available", isAvailable));
     }
 
