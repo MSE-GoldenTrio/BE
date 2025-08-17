@@ -21,7 +21,6 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
             Users user = findByField("email", encryptedEmail); // 이메일을 기반으로 조회
             return Optional.ofNullable(user);
         } catch (ExecutionException | InterruptedException e) {
-            e.printStackTrace();
             return Optional.empty();
         }
     }
@@ -31,7 +30,6 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
             Users user = findByFields(Map.of("emailHash", emailHash)); // 아이디(닉네임) 기반으로 조회
             return Optional.ofNullable(user);
         } catch (ExecutionException | InterruptedException e) {
-            e.printStackTrace();
             return Optional.empty();
         }
     }
@@ -42,7 +40,6 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
             Users user = findByField("nickname", encryptedNickname);
             return Optional.ofNullable(user);
         } catch (ExecutionException | InterruptedException e) {
-            e.printStackTrace();
             return Optional.empty();
         }
     }
@@ -52,7 +49,6 @@ public class UserRepository extends DefaultFirebaseDBRepository<Users> {
             Users user = findByFields(Map.of("nicknameHash", nicknameHash)); // 아이디(닉네임) 기반으로 조회
             return Optional.ofNullable(user);
         } catch (ExecutionException | InterruptedException e) {
-            e.printStackTrace();
             return Optional.empty();
         }
     }

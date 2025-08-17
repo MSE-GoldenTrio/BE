@@ -14,6 +14,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -232,9 +233,7 @@ public class UserController {
     @PostMapping("/auth/reset-password-request")
     public ResponseEntity<?> requestResetPassword(@RequestBody Map<String, String> payload) throws Exception {
         String email = payload.get("email");
-        Users user = userService.findByHashEmail(email);
-
-        if(user == null) user = userService.findByEncryptedEmail(email);
+        Users user = userService.findByHashEmail(DigestUtils.sha256Hex(email));
 
         System.out.println("Email: " + email);
         System.out.println("User: " + user);
@@ -266,7 +265,9 @@ public class UserController {
             }else{
                 throw new CustomException("이메일을 입력해주세요.", null, HttpStatus.BAD_REQUEST, null);
             }
-        }catch (Exception e){
+        } catch(CustomException ce){
+            throw ce;
+        } catch (Exception e){
             throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 

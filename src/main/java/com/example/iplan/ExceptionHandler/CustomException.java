@@ -14,15 +14,15 @@ public class CustomException extends RuntimeException {
     private final String detail;
     private final String stackTraceString;
 
-    public CustomException(String message, @Nullable String detail, HttpStatus status, @Nullable Exception error) {
+    public CustomException(String message, @Nullable String detail, HttpStatus status, @Nullable Throwable cause) {
         super(message);
         this.status = status;
         this.detail = detail;
-        assert error != null;
-        this.stackTraceString = getStackTraceAsString(error);
+        this.stackTraceString = cause != null? getStackTraceAsString(cause) : null;
     }
 
     public static String getStackTraceAsString(Throwable e) {
+        if(e == null) return null; // NPE 방지
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
         e.printStackTrace(pw);

@@ -7,6 +7,10 @@ import com.example.iplan.Repository.PlanChildRepository;
 import com.example.iplan.Repository.RewardChildRepository;
 import com.example.iplan.Service.AlarmService;
 import com.example.iplan.Service.PlanChildService;
+import com.example.iplan.auth.oauth2.DTO.KakaoTokenResponse;
+import com.example.iplan.auth.oauth2.DTO.NaverTokenResponse;
+import com.example.iplan.auth.oauth2.SocialClientService;
+import com.example.iplan.auth.redis.OAuth2ProviderTokenService;
 import com.example.iplan.fcm.FcmRequestDTO;
 import com.example.iplan.fcm.FcmRequestService;
 import com.example.iplan.fcm.FcmToken;
@@ -64,6 +68,9 @@ public class UserService {
     private final AlarmService alarmService;
     private final PushSchedulerService pushSchedulerService;
     private final FcmRequestService fcmRequestService;
+
+    private final OAuth2ProviderTokenService providerTokenService;
+    private final SocialClientService socialClientService;
 
     private final AES256Encryptor aes;
 
@@ -170,6 +177,8 @@ public class UserService {
                         user.setFirebaseAuthUID(userRecord.getUid());
                         userRepository.update(user);
                     }
+                } catch(CustomException ce){
+                    throw ce;
                 } catch (Exception e) {
                     log.error("Firebase 사용자 생성 중 오류", e);
                     throw new CustomException("Firebase 사용자 생성 중 오류", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, e);
@@ -213,46 +222,84 @@ public class UserService {
 
     /**
      * 계정 탈퇴
-     * @param accessToken
-     * @param fcmToken
-     * @param encryptedUserId
      */
     public String withdraw(String accessToken, String fcmToken, String encryptedUserId) throws ExecutionException, InterruptedException {
-        String nickname = jwtTokenProvider.getUserNickname(accessToken);
-        Users user = userRepository.findByHashValueNickName(DigestUtils.sha256Hex(nickname))
+
+        Users user = userRepository.findByEncryptedNickname(encryptedUserId)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다", null, HttpStatus.NOT_FOUND, null));
+
+        String provider = user.getProvider();
+        String subject = user.getEmailHash();
+
+        String p_access = providerTokenService.getAccessToken(provider, subject).orElse(null);
+        String p_refresh = providerTokenService.getRefreshToken(provider, subject).orElse(null);
+
         String uid = user.getFirebaseAuthUID();
-        log.info("계정 탈퇴 사용자 nickname: {}, Firebase uid: {}", nickname, uid);
 
         // 1. FCM 토큰 삭제
         if (fcmToken != null && !fcmToken.isBlank()) {
             fcmTokenService.deleteToken(user.getNicknameHash(), fcmToken);
         }
 
-        // 1. 토큰 무효화
-        jwtTokenProvider.destroyToken(accessToken, "withdraw");
-
-        // 2. 연동 해제
-        for (String linkedId : user.getLinked_id()) {
-            deleteLinkedId(user.getEmail(), linkedId);
-        }
-
-        // 3. 소셜 연동 해제
-        if(user.getProvider() != null && user.getProviderAccessToken() != null){
+        // 2. 소셜 연동 해제
+        if(provider != null) {
             try{
-                unlinkSocial(user.getProvider(), user.getProviderAccessToken());
-            }catch (Exception e){
-                log.warn("소셜 연동 해제 실패 : {}", e.getMessage());
-                throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST,e );
+                //unlinkSocial(user.getProvider(), user.getProviderAccessToken());
+                switch (provider){
+                    case "google" -> {
+                        // 구글은 refreshToken이 있으면 그걸로 바로 함
+                        String revokeToken = (p_refresh != null) ? p_refresh : p_access;
+                        if(revokeToken != null){
+                            socialClientService.unlinkGoogle(revokeToken);
+                        } else{
+                            log.warn("Google unlink: no token found. Skip remote revoke.");
+                        }
+                    }
+                    case "kakao" -> {
+                        if(p_access != null){
+                            socialClientService.unlinkKakaoByAccess(p_access);
+                        } else if(p_refresh != null){
+                            KakaoTokenResponse t = socialClientService.reissueKakaoToken(p_refresh);
+
+                            if(t.getAccessToken() != null){
+                                socialClientService.unlinkKakaoByAccess(t.getAccessToken());
+                            } else {
+                                log.warn("Kakao unlink: cannot reissue access. Skip remote revoke.");
+                            }
+                        } else {
+                            log.warn("Kakao unlink: no token. Skip remote revoke.");
+                        }
+                    }
+                    case "naver" -> {
+                        if(p_access == null && p_refresh != null){
+                            NaverTokenResponse t = socialClientService.reissueNaverToken(p_refresh);
+                            p_access = t.getAccessToken();
+                        }
+                        if(p_access != null){
+                            boolean ok = socialClientService.unlinkNaver(p_access);
+                            if(!ok) log.warn("네이버 연동 해제 실패");
+                        } else {
+                            log.warn("Naver unlink: no token available. Skip remote revoke.");
+                        }
+                    }
+                    default -> log.warn("알 수 없는 provider: {}", provider);
+                }
+            } finally {
+                // 로컬 정리 (항상)
+                providerTokenService.deleteAll(provider, subject);
             }
-            user.setProviderAccessToken(null); // 토큰 사용 후 파기
         }
 
-        // 4. 관련 데이터 삭제 (계획, 보상, 피드백)
+        // 3. 관련 데이터 삭제 (계획, 보상, 피드백)
         planChildRepository.deleteAllByUserId(encryptedUserId);
         rewardChildRepository.deleteAllByUserId(encryptedUserId);
         feedbackRepository.deleteAllByUserId(encryptedUserId);
         log.info("관련 데이터 삭제 완료");
+
+        // 4. 연동 해제
+        for (String linkedId : user.getLinked_id()) {
+            deleteOpponentLinkedId(user.getEmail(), linkedId);
+        }
 
         // 5. 유저 삭제
         userRepository.delete(user);
@@ -269,93 +316,11 @@ public class UserService {
             throw new CustomException("회원 탈퇴 실패", "Firebase 사용자 삭제 실패: " + e, HttpStatus.INTERNAL_SERVER_ERROR,e );
         }
 
-        log.info("회원 탈퇴 완료: {}", nickname);
+        // 제일 마지막에 ! 토큰 무효화
+        jwtTokenProvider.destroyToken(accessToken, "withdraw");
+
         return "Delete User Successfully";
     }
-
-    public void unlinkSocial(String provider, String providerAccessToken){
-        if(providerAccessToken == null || providerAccessToken.isBlank()){
-            log.warn("소셜 연동 해제 생략: 토큰 없음");
-            return;
-        }
-
-        try{
-            switch (provider.toUpperCase()){
-                case "KAKAO":
-                    unlinkKakao(providerAccessToken);
-                    break;
-                case "NAVER":
-                    unlinkNaver(providerAccessToken);
-                    break;
-                case "GOOGLE":
-                    unlinkGoogle(providerAccessToken);
-                    break;
-                default:
-                    log.warn("지원하지 않는 소셜 provider입니다: {}", provider);
-            }
-        }catch(Exception e){
-            log.warn("{} 소셜 연동 해제 중 오류 발생: {}", provider, e.getMessage());
-            throw new CustomException("소셜 연동 해제 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
-        }
-    }
-
-    private void unlinkKakao(String accessToken){
-        String url = "https://kapi.kakao.com/v1/user/unlink";
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + accessToken);
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-        ResponseEntity<String> response = new RestTemplate().postForEntity(url, entity, String.class);
-
-        if(response.getStatusCode().is2xxSuccessful()){
-            log.info("카카오 연동 해제 성공");
-        }else{
-            log.warn("카카오 연도오 해제 실패 또는 이미 해제됨: {}", response.getBody());
-        }
-    }
-    private void unlinkGoogle(String accessToken) {
-        String url = "https://oauth2.googleapis.com/revoke?token=" + accessToken;
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-        ResponseEntity<String> response = new RestTemplate().postForEntity(url, entity, String.class);
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            log.info("구글 연동 해제 성공");
-        } else {
-            log.warn("구글 연동 해제 실패 또는 이미 해제됨: {}", response.getBody());
-        }
-    }
-
-    @Value("${spring.security.oauth2.client.registration.naver.client-id}")
-    private String naverClientId;
-
-    @Value("${spring.security.oauth2.client.registration.naver.client-secret}")
-    private String naverClientSecret;
-
-    private void unlinkNaver(String accessToken) {
-        String url = "https://nid.naver.com/oauth2.0/token" +
-                "?grant_type=delete" +
-                "&client_id=" + naverClientId +
-                "&client_secret=" + naverClientSecret +
-                "&access_token=" + accessToken +
-                "&service_provider=NAVER";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-        ResponseEntity<String> response = new RestTemplate().postForEntity(url, entity, String.class);
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            log.info("네이버 연동 해제 성공");
-        } else {
-            log.warn("네이버 연동 해제 실패 또는 이미 해제됨: {}", response.getBody());
-        }
-    }
-
 
     /**
      * 닉네임을 기반으로 사용자 조회
@@ -532,11 +497,72 @@ public class UserService {
                 }else{
                     log.warn("연동 요청을 보낼 유저({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(encryptedLinkedId));
                 }
-            }catch (Exception e){
+            } catch(CustomException ce){
+                throw ce;
+            } catch (Exception e){
                 throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
 
-        }catch (Exception e){
+        } catch(CustomException ce){
+            throw ce;
+        } catch (Exception e){
+            throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
+        }
+    }
+
+    public void deleteOpponentLinkedId(String encryptedEmail, String encryptedLinkedId){
+        log.info("입력된 encryptedEmail: {}", encryptedEmail);
+        log.info("입력된 encryptedLinkedId: {}", encryptedLinkedId);
+
+        try{
+            // 1. 계정 연동 해제를 요청한(혹은 계정 탈퇴하는) 유저 조회
+            Users request_user = findByEncryptedEmail(encryptedEmail);
+            log.info("연동을 해제를 요청하는 유저의 닉네임: {}", aes.decrypt(request_user.getNickname()));
+
+            // 2. (requestUser 와 연동된) linked_id 에 해당하는 유저 조회
+            Users linked_user = findByEncryptedNickname(encryptedLinkedId);
+
+            List<String> linked_user_linked_id = linked_user.getLinked_id();
+            linked_user_linked_id.remove(request_user.getNickname());
+            linked_user.setLinked_id(linked_user_linked_id);
+
+            userRepository.update(linked_user);
+            log.info("상대의 연동 아이디 리스트에서 내(탈퇴한) 계정 삭제 완료");
+
+            // 연동 해제 되었다는 알림을 보낼 상대의 FcmToken찾기
+            List<FcmToken> fcmTokens = fcmTokenService.getTokensByHashedUserId(DigestUtils.sha256Hex(aes.decrypt(encryptedLinkedId)));
+
+            try{
+                if(!fcmTokens.isEmpty()){
+                    for(FcmToken fcmToken : fcmTokens){
+                        FcmRequestDTO requestDto = FcmRequestDTO.builder()
+                                .user_id(fcmToken.getUser_id())
+                                .fcmToken(fcmToken.getToken())
+                                .notification(FcmRequestDTO.Notification.builder()
+                                        .title("iPlan")
+                                        .body(aes.decrypt(request_user.getNickname()) + "과(와)의 연동이 해제되었습니다.")
+                                        .build())
+                                .data(FcmRequestDTO.Data.builder()
+                                        .pendingRequestId(null)
+                                        .sender(aes.decrypt(request_user.getNickname()))
+                                        .type("DeleteLinkedId")
+                                        .build())
+                                .build();
+                        fcmRequestService.sendPush(requestDto);
+                        log.info("연동 해제 알람을 성공적으로 보냈습니다.");
+                    }
+                }else{
+                    log.warn("연동 요청을 보낼 유저({})의 FcmToken이 존재하지 않습니다.", aes.decrypt(encryptedLinkedId));
+                }
+            } catch(CustomException ce){
+                throw ce;
+            } catch (Exception e){
+                throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
+            }
+
+        } catch(CustomException ce){
+            throw ce;
+        } catch (Exception e){
             throw new CustomException("연동 아이디 제거 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
         }
     }
@@ -553,6 +579,8 @@ public class UserService {
 
             Users user = optionalUser.get();
             return new CustomOAuth2UserDetails(user);
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             log.error("loadUserByEncryptedNickname 오류: {}", e.getMessage());
             throw new CustomException("사용자 정보 불러오기 실패", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);

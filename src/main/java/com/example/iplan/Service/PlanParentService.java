@@ -92,6 +92,8 @@ public class PlanParentService {
             } else {
                 throw new CustomException("계획 불러오기 실패", planId + " ID의 계획이 존재하지 않음", HttpStatus.NOT_FOUND, null);
             }
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
