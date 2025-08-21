@@ -27,6 +27,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.awt.*;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -40,6 +42,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
+import com.drew.imaging.ImageMetadataReader;
+import com.drew.metadata.Metadata;
+import com.drew.metadata.exif.ExifSubIFDDirectory;
 
 @Service
 @Slf4j
@@ -167,15 +173,36 @@ public class ScreenTimeService {
                     throw new CustomException("파일 저장 중 오류 발생", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
                 }
 
-                // 2. 파일 생성 시간 확인(캡쳐 시간 확인)
-                BasicFileAttributes attr = Files.readAttributes(filePath, BasicFileAttributes.class);
-                FileTime creationTime = attr.creationTime();
-                LocalDateTime creationDateTime = creationTime
-                        .toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDateTime();
+                // 2. 사진 실제 캡쳐 시간 확인 (EXIF 메타데이터 우선, 실패 시 한국 시간 기준으로 서버 저장 시간 기준)
+                ZonedDateTime captureKst = null;
+                ZoneId KST = ZoneId.of("Asia/Seoul");
 
-                System.out.println("파일 생성 시간: " + creationDateTime);
+                try (InputStream inputStream = image.getInputStream()) {
+                    Metadata metadata = ImageMetadataReader.readMetadata(inputStream);
+                    ExifSubIFDDirectory directory = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
+
+                    if (directory != null) {
+                        // EXIF의 촬영 시간(있다면) 한국 시간 기준으로 해석
+                        Date exifDate = directory.getDateOriginal(TimeZone.getTimeZone("Asia/Seoul"));
+                        if (exifDate != null) {
+                            captureKst = exifDate.toInstant().atZone(KST);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("EXIF 메타데이터 파싱 실패: {}", e.getMessage());
+                }
+
+                if (captureKst == null) {
+                    // Fallback: 서버 저장 시간(파일 생성 시간)을 KST로 변환
+                    BasicFileAttributes attr = Files.readAttributes(filePath, BasicFileAttributes.class);
+                    captureKst = attr.creationTime().toInstant().atZone(KST);
+                    log.info("EXIF 촬영 시간 없음. 서버 저장 시간으로 대체(한국 시간).");
+                }
+
+                // 필요 시 LocalDateTime/문자열로 변환해서 사용
+                LocalDateTime creationDateTime = captureKst.toLocalDateTime();
+                String captureFormatted = captureKst.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                System.out.println("사진 촬영(캡쳐) 시간[KST]: " + captureFormatted);
 
                 // 파일 생성 날짜가 오늘이고, 마감 시간을 넘겼을 경우에만 OCR 수행
                 if (IsInValidScreenShot(user_id, creationDateTime)) {
