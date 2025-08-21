@@ -3,6 +3,7 @@ package com.example.iplan.scheduler;
 import com.example.iplan.Domain.PlanChild;
 import com.example.iplan.Service.AlarmService;
 import com.example.iplan.fcm.FcmRequestService;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.TaskScheduler;
@@ -23,6 +24,7 @@ public class PushSchedulerService {
     private final TaskScheduler taskScheduler;
     private final FcmRequestService fcmRequestService;
     private final AlarmService alarmService;
+    private final AES256Encryptor aes;
 
     // planId -> (fcmToken -> future)
     private Map<String, Map<String, ScheduledFuture<?>>> scheduledTasks = new ConcurrentHashMap<>();
@@ -61,7 +63,7 @@ public class PushSchedulerService {
             }
         }
 
-        PushTask task = new PushTask(plan, fcmToken, fcmRequestService, alarmService);
+        PushTask task = new PushTask(plan, fcmToken, fcmRequestService, alarmService, aes);
         Date executeAt = new Date(System.currentTimeMillis() + delay);
         // 예약된 작업 저장
         ScheduledFuture<?> future = taskScheduler.schedule(task, executeAt);

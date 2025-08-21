@@ -5,7 +5,7 @@ import com.example.iplan.Service.AlarmService;
 import com.example.iplan.fcm.FcmRequestDTO;
 import com.example.iplan.fcm.FcmRequestService;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.firebase.messaging.FirebaseMessagingException;
+import com.example.iplan.util.AES256Encryptor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ExecutionException;
@@ -17,24 +17,34 @@ public class PushTask implements Runnable {
     private final String fcmToken;
     private final FcmRequestService fcmRequestService;
     private final AlarmService alarmService;
+    private final AES256Encryptor aes;
 
     // PushTask 클래스의 생성자
-    public PushTask(PlanChild plan, String fcmToken, FcmRequestService fcmRequestService, AlarmService alarmService) {
+    public PushTask(PlanChild plan, String fcmToken, FcmRequestService fcmRequestService, AlarmService alarmService, AES256Encryptor aes) {
         this.plan = plan;
         this.fcmToken = fcmToken;
         this.fcmRequestService = fcmRequestService;
-        this.alarmService = alarmService; // 추가
+        this.alarmService = alarmService;
+        this.aes = aes;
     }
 
     @Override
     public void run() {
+        String decryptedTitle;
+        try {
+            decryptedTitle = aes.decrypt(plan.getTitle()); // 복호화
+        } catch (Exception e) {
+            log.error("제목 복호화 실패: {}", e.getMessage());
+            decryptedTitle = "(제목 오류)";
+        }
+
         // 1. FcmRequestDTO 생성
         FcmRequestDTO requestDTO = FcmRequestDTO.builder()
                 .user_id(plan.getHashed_user_id())
                 .fcmToken(fcmToken)
                 .notification(FcmRequestDTO.Notification.builder()
                         .title("iPlan")
-                        .body(plan.getTitle() + " 시작할 시간이에요!")
+                        .body(decryptedTitle + " 시작할 시간이에요!")
                         .build())
                 .data(FcmRequestDTO.Data.builder()
                         .pendingRequestId(null)
