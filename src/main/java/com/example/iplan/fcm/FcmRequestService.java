@@ -6,6 +6,7 @@ import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import java.time.*;
 
 @Slf4j
 @Service
@@ -51,6 +52,11 @@ public class FcmRequestService {
                 .build();
 
         try {
+            // 현재 시각 로그 (서버/UTC/KST 동시)
+            Instant now = Instant.now();
+            ZonedDateTime nowKst = now.atZone(ZoneId.of("Asia/Seoul"));
+            log.info("푸시 발송 시각 - UTC: {}, KST: {}", now, nowKst);
+
             String response = FirebaseMessaging.getInstance().send(message);
             log.info("FCM 전송 성공: {}",response);
 
