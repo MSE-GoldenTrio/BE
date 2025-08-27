@@ -331,7 +331,7 @@ public class UserService {
     }
 
     public Users findByHashEmail(String email){
-        Optional<Users> user = userRepository.findByHashValueEmail(DigestUtils.sha256Hex(email));
+        Optional<Users> user = userRepository.findByHashValueEmail(email);
         return user.orElse(null);
     }
 
