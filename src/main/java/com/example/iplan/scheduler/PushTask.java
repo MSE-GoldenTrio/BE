@@ -44,7 +44,7 @@ public class PushTask implements Runnable {
                 .fcmToken(fcmToken)
                 .notification(FcmRequestDTO.Notification.builder()
                         .title("iPlan")
-                        .body(decryptedTitle + " 시작할 시간이에요!")
+                        .body(decryptedTitle + " 시작할 시간이에요 ٩(ˊᗜˋ*)و")
                         .build())
                 .data(FcmRequestDTO.Data.builder()
                         .pendingRequestId(null)
