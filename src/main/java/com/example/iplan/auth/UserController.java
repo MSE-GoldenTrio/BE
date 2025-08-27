@@ -6,6 +6,10 @@ import com.example.iplan.auth.DTO.SignUpDTO;
 import com.example.iplan.auth.oauth2.CustomOAuth2UserDetails;
 import com.example.iplan.auth.jwt.JwtToken;
 import com.example.iplan.auth.jwt.JwtTokenProvider;
+import com.google.cloud.Timestamp;
+import com.google.cloud.firestore.DocumentReference;
+import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.Firestore;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
@@ -24,6 +28,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -38,6 +43,7 @@ public class UserController {
     private final ParentsConsentService parentsConsentService;
     private final JwtTokenProvider jwtTokenProvider;
     private final AES256Encryptor aes;
+    private final Firestore firestore;
 
     @PostMapping("/auth/register")
     @Operation(summary = "회원가입")
@@ -319,7 +325,30 @@ public class UserController {
     }
 
     @GetMapping("/auth/mailsender-redirect")
-    public ResponseEntity<String> redirectPage(@RequestParam String token) {
+    public ResponseEntity<String> redirectPage(@RequestParam String token) throws Exception {
+        DocumentReference ref = firestore.collection("PasswordResetTokens").document(token);
+        DocumentSnapshot snap = ref.get().get();
+
+        // 1. 토큰 존재 확인
+        if (!snap.exists()) {
+            return expiredHtml("유효하지 않은 링크입니다.");
+        }
+
+        // 2. 만료 및 사용 여부 확인
+        Boolean used = snap.getBoolean("used");
+        Timestamp expiresAt = snap.getTimestamp("expiresAt");
+
+        if (Boolean.TRUE.equals(used)) {
+            return expiredHtml("이미 사용된 링크입니다.");
+        }
+        if (expiresAt == null || expiresAt.compareTo(Timestamp.now()) <= 0) {
+            return expiredHtml("만료된 링크입니다.");
+        }
+
+        // 3. 유효한 경우 → used=true 로 업데이트 (일회용 보장)
+        ref.update("used", true, "usedAt", Timestamp.now());
+
+        // 4. 앱 딥링크 HTML 생성
         String html = """
         <html>
         <head>
@@ -328,7 +357,6 @@ public class UserController {
           <script>
             const token = '%s';
             const scheme = `iplan://reset-password?token=${token}`;
-            alert("Redirecting to: " + scheme);
             window.onload = () => {
               setTimeout(() => {
                 window.location.href = scheme;
@@ -347,6 +375,28 @@ public class UserController {
         headers.setContentType(new MediaType("text", "html", StandardCharsets.UTF_8));
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
     }
+
+    // 토큰이 무효/만료된 경우 보여줄 안내 페이지
+    private ResponseEntity<String> expiredHtml(String msg) {
+        String html = """
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>링크 오류</title>
+        </head>
+        <body>
+          <h3>비밀번호 재설정</h3>
+          <p>%s</p>
+          <p>앱에서 다시 비밀번호 재설정을 요청해 주세요.</p>
+        </body>
+        </html>
+        """.formatted(msg);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(new MediaType("text", "html", StandardCharsets.UTF_8));
+        return new ResponseEntity<>(html, headers, HttpStatus.GONE); // 410 Gone
+    }
+
 
     @DeleteMapping("/my_page/delete/linked_id")
     public ResponseEntity<?> deleteLinkedID(@AuthenticationPrincipal CustomOAuth2UserDetails userDetails, @RequestParam("linked_id") String encryptedLinkedId){
