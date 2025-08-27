@@ -240,7 +240,7 @@ public class UserController {
 
         if(user != null)
         {
-            passwordResetService.sendResetLink(email);
+            passwordResetService.sendResetLink(user.getEmail());
             return ResponseEntity.ok(Map.of(
                     "message", "메일 전송에 성공하였습니다."
             ));
