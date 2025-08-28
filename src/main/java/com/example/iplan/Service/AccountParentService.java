@@ -126,11 +126,10 @@ public class AccountParentService {
 
     /**
      * 부모가 이미 보낸 연동요청이 있는지 체크
-     * status가 pending 또는 approved (denied 경우는 클라에서 부모쪽이 확인한 이후 바로 삭제됨)
      */
     public ResponseEntity<Map<String, Object>> getParentPendingStatus(String parentEncryptedNickname) {
         try {
-            List<String> validStatuses = List.of("pending", "approved");
+            List<String> validStatuses = List.of("pending", "approved", "denied");
             PendingAccountRequest pendingRequest = accountRepository
                     .findParentRequestByStatuses(parentEncryptedNickname, validStatuses);
 
