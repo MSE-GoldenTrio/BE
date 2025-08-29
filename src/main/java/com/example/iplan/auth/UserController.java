@@ -258,7 +258,7 @@ public class UserController {
                     "message", "메일 전송에 성공하였습니다."
             ));
         }else{
-            throw new CustomException("해당 이메일에 등록된 사용자가 없습니다.", null, HttpStatus.NOT_FOUND, null);
+            throw new CustomException("해당 이메일에 등록된 사용자가 없습니다. 회원가입을 진행해주세요", null, HttpStatus.NOT_FOUND, null);
         }
     }
 
