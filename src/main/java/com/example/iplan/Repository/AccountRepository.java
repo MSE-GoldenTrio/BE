@@ -30,6 +30,13 @@ public class AccountRepository extends DefaultFirebaseDBRepository<PendingAccoun
         return findByFields(filters);
     }
 
+    // 부모가 보낸 요청이 있는지 확인 -> status 조건 한 개!!
+    public PendingAccountRequest findParentRequestByStatus(String parentEncryptedNickname, String status)
+            throws ExecutionException, InterruptedException {
+
+        return findByField("status", status);
+    }
+
     // 부모가 보낸 요청이 있는지 확인 -> status 여러개 조건 포함
     public PendingAccountRequest findParentRequestByStatuses(String parentEncryptedNickname, List<String> statuses)
             throws ExecutionException, InterruptedException {

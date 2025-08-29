@@ -99,7 +99,7 @@ public class AccountParentService {
                             .fcmToken(fcmToken.getToken()) // 그냥 아무것도 안된 token
                             .notification(FcmRequestDTO.Notification.builder()
                                     .title("iPlan")
-                                    .body(aes.decrypt(parentEncryptedNickname) + " 부모님이 연동 요청을 보냈습니다. 눌러서 확인하세요.") // 평문 id
+                                    .body(aes.decrypt(parentEncryptedNickname) + " 부모님이 연동 요청을 보냈어요! 눌러서 확인하세요 \uD83D\uDD90\uD83C\uDFFB") // 평문 id
                                     .build())
                             .data(FcmRequestDTO.Data.builder()
                                     .pendingRequestId(request.getId())
@@ -126,13 +126,11 @@ public class AccountParentService {
 
     /**
      * 부모가 이미 보낸 연동요청이 있는지 체크
-     * status가 pending 또는 approved (denied 경우는 클라에서 부모쪽이 확인한 이후 바로 삭제됨)
+     * * status == pending (approved, denied 경우는 클라에서 부모쪽이 확인한 이후 바로 삭제됨)
      */
     public ResponseEntity<Map<String, Object>> getParentPendingStatus(String parentEncryptedNickname) {
         try {
-            List<String> validStatuses = List.of("pending", "approved");
-            PendingAccountRequest pendingRequest = accountRepository
-                    .findParentRequestByStatuses(parentEncryptedNickname, validStatuses);
+            PendingAccountRequest pendingRequest = accountRepository.findParentRequestByStatus(parentEncryptedNickname, "pending");
 
             if (pendingRequest != null) {
                 String childEncryptedNickname = pendingRequest.getChildEncryptedNickname();

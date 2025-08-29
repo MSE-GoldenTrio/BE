@@ -150,7 +150,7 @@ public class AccountChildService {
                             .fcmToken(fcmToken.getToken()) // 그냥 아무것도 안된 token
                             .notification(FcmRequestDTO.Notification.builder()
                                     .title("iPlan")
-                                    .body(aes.decrypt(parentEncryptedNickname) + " 부모님이 연동 요청을 보냈습니다. 눌러서 확인하세요.") // 평문 id
+                                    .body(aes.decrypt(parentEncryptedNickname) + " 부모님이 연동 요청을 보냈어요! 눌러서 확인하세요 \uD83D\uDD90\uD83C\uDFFB") // 평문 id
                                     .build())
                             .data(FcmRequestDTO.Data.builder()
                                     .pendingRequestId(pendingRequestId)
