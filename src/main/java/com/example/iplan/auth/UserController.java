@@ -220,10 +220,11 @@ public class UserController {
         }
 
         try {
-            if(userDetails.getUser().getProvider().isBlank() || userDetails.getUser().getProvider().isEmpty()){
-                throw new CustomException("소셜 로그인 사용자는 비밀번호를 변경할 수 없습니다.", null, HttpStatus.BAD_REQUEST, null);
-            }
             String email = userDetails.getEmail();
+            Users user = userService.findByEncryptedEmail(email);
+            if(user != null && user.getProvider() != null && !user.getProvider().isBlank()){
+                throw new CustomException("소셜 로그인 사용자는 비밀번호를 변경 할 수 없습니다.", null, HttpStatus.BAD_REQUEST, null);
+            }
             System.out.println("비밀번호 변경 요청 이메일: " + aes.decrypt(email));
             passwordResetService.sendResetLink(email);
             return ResponseEntity.ok(Map.of("message", "이메일 전송에 성공했습니다."));
@@ -249,7 +250,7 @@ public class UserController {
 
         if(user != null)
         {
-            if(user.getProvider().isBlank() || user.getProvider().isEmpty()){
+            if(user.getProvider() != null && !user.getProvider().isBlank()){
                 throw new CustomException("소셜 로그인 사용자는 비밀번호를 변경할 수 없습니다.", null, HttpStatus.BAD_REQUEST, null);
             }
             passwordResetService.sendResetLink(user.getEmail());
