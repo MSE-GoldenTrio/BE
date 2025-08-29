@@ -232,7 +232,7 @@ public class UserController {
             throw ce;
         } catch (Exception e) {
             System.out.println("예외 발생: " + e.getMessage());
-            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST, e);
+            throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
     }
 
