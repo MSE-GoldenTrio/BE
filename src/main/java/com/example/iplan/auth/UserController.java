@@ -18,7 +18,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.codec.digest.DigestUtils;
+import org.springframework.web.util.HtmlUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -45,6 +45,63 @@ public class UserController {
     private final JwtTokenProvider jwtTokenProvider;
     private final AES256Encryptor aes;
     private final Firestore firestore;
+
+    private static final String REDIRECT_HTML = """
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>앱으로 이동 중...</title>
+      <style>
+        /* ... */
+        .card{max-width:560px;width:100%;}
+      </style>
+      <script>
+        const token = '__TOKEN__';
+        const scheme = 'iplan://reset-password?token=' + token;
+        let n=1;
+        function tick(){ const el=document.querySelector('.dots'); if(el){ el.textContent='•'.repeat(n); n = n%3 + 1; } }
+        window.onload = () => {
+          setInterval(tick, 400);
+          setTimeout(() => { window.location.href = scheme; }, 500);
+        };
+      </script>
+    </head>
+    <body>
+      <main class="wrap">
+        <section class="card">
+          <h1 class="title">앱으로 이동 중...</h1>
+          <p class="desc">iPlan에서 비밀번호 재설정을 이어서 진행합니다.</p>
+          <div class="dots">•</div>
+          <a class="btn" href="iplan://reset-password?token=__TOKEN__">앱에서 열기</a>
+          <p class="sub">자동으로 열리지 않으면 위 버튼을 눌러주세요.</p>
+        </section>
+      </main>
+    </body>
+    </html>
+    """;
+
+    private static final String EXPIRED_HTML = """
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>링크 오류</title>
+      <style>
+        .card{max-width:560px;width:100%;}
+      </style>
+    </head>
+    <body>
+      <main class="wrap">
+        <section class="card">
+          <h2 class="title">❌ 링크가 유효하지 않습니다</h2>
+          <p class="desc">__MSG__</p>
+          <p class="sub">앱에서 다시 비밀번호 재설정을 요청해 주세요.</p>
+        </section>
+      </main>
+    </body>
+    </html>
+    """;
 
     @PostMapping("/auth/register")
     @Operation(summary = "회원가입")
@@ -358,52 +415,22 @@ public class UserController {
         // 3. 링크를 클릭한 시간 로그/마킹
         ref.update("clickedAt", Timestamp.now());
 
-        // 4. 앱 딥링크 HTML 생성
-        String html = """
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>앱으로 이동 중...</title>
-          <script>
-            const token = '%s';
-            const scheme = `iplan://reset-password?token=${token}`;
-            window.onload = () => {
-              setTimeout(() => {
-                window.location.href = scheme;
-              }, 1000);
-            };
-          </script>
-        </head>
-        <body>
-          <p>앱으로 이동 중입니다...</p>
-          <p>앱이 열리지 않으면 <a href="iplan://reset-password?token=%s">여기를 클릭하세요</a></p>
-        </body>
-        </html>
-        """.formatted(token, token);
+        String html = REDIRECT_HTML.replace("__TOKEN__", token);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(new MediaType("text", "html", StandardCharsets.UTF_8));
+        headers.set("Content-Type", "text/html; charset=UTF-8");
+        headers.setCacheControl("no-store");
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
     }
 
     // 토큰이 무효/만료된 경우 보여줄 안내 페이지
     private ResponseEntity<String> expiredHtml(String msg) {
-        String html = """
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>링크 오류</title>
-        </head>
-        <body>
-          <h3>비밀번호 재설정</h3>
-          <p>%s</p>
-          <p>앱에서 다시 비밀번호 재설정을 요청해 주세요.</p>
-        </body>
-        </html>
-        """.formatted(msg);
+        String safeMsg = HtmlUtils.htmlEscape(msg); // XSS 방지
+        String html = EXPIRED_HTML.replace("__MSG__", safeMsg);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(new MediaType("text", "html", StandardCharsets.UTF_8));
+        headers.set("Content-Type", "text/html; charset=UTF-8");
+        headers.setCacheControl("no-store");
         return new ResponseEntity<>(html, headers, HttpStatus.GONE); // 410 Gone
     }
 
