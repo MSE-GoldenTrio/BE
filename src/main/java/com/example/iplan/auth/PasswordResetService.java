@@ -36,16 +36,19 @@ public class PasswordResetService {
     public void sendResetLink(String encryptEmail){
         try{
             String token = UUID.randomUUID().toString();
-            Timestamp expiresAt = Timestamp.ofTimeSecondsAndNanos(Instant.now().plusSeconds(1800).getEpochSecond(),0);
+            Timestamp expiresAt = Timestamp.ofTimeSecondsAndNanos(Instant.now().plusSeconds(5 * 60).getEpochSecond(),0);
 
             Map<String, Object> data = new HashMap<>();
             data.put("email", encryptEmail); //암호화된 이메일 그대로
+            data.put("used", false);
             data.put("expiresAt", expiresAt);
+            data.put("createdAt", Timestamp.now());
 
             firestore.collection("PasswordResetTokens").document(token).set(data).get();
 
             //테스트 시 본인 로컬 IP주소로 변경(추후 서버 주소로 변경)
             String webRedirectLink = "https://iplanner.site/api/auth/mailsender-redirect?token=" + token;
+
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
@@ -68,27 +71,51 @@ public class PasswordResetService {
     }
 
     public void resetPassword(String token, String newPassword) throws ExecutionException, InterruptedException {
-        DocumentReference docRef = firestore.collection("PasswordResetTokens").document(token);
-        DocumentSnapshot doc = docRef.get().get();
+        // 1) 트랜잭션으로 used=false → true 원자 업데이트 (+ 유효성 체크)
+        String encEmail = firestore.runTransaction(tx -> {
+            DocumentReference ref = firestore.collection("PasswordResetTokens").document(token);
+            DocumentSnapshot doc = tx.get(ref).get();
 
-        if(!doc.exists()) {
-            System.out.println("유효하지 않는 토큰입니다.");
-            throw new CustomException("비밀번호 재설정 시간이 만료되었습니다. 다시 시도해주세요.", "비밀번호 재설정 토큰이 존재하지 않습니다.", HttpStatus.BAD_REQUEST, null);
+            if (!doc.exists()) {
+                throw new CustomException("비밀번호 재설정 시간이 만료되었습니다. 다시 시도해주세요.",
+                        "토큰 문서 없음", HttpStatus.BAD_REQUEST, null);
+            }
+
+            Boolean used = doc.getBoolean("used");
+            Timestamp expiresAt = doc.getTimestamp("expiresAt");
+            if (Boolean.TRUE.equals(used)) {
+                throw new CustomException("이미 사용된 링크입니다. 다시 요청해주세요.",
+                        "used=true", HttpStatus.BAD_REQUEST, null);
+            }
+            if (expiresAt == null || expiresAt.compareTo(Timestamp.now()) <= 0) {
+                throw new CustomException("비밀번호 재설정 시간이 만료되었습니다. 다시 시도해주세요.",
+                        "만료", HttpStatus.BAD_REQUEST, null);
+            }
+
+            // 여기서 일회용 보장: used=true로 마킹
+            tx.update(ref, "used", true, "usedAt", Timestamp.now());
+
+            String email = doc.getString("email"); // 암호화된 이메일
+            if (email == null || email.isBlank()) {
+                throw new CustomException("비정상 요청입니다. 다시 시도해주세요.",
+                        "email 필드 없음", HttpStatus.BAD_REQUEST, null);
+            }
+            return email;
+        }).get();
+
+        // 2) 트랜잭션 커밋 완료 후 실제 비밀번호 변경(서비스 내부에서 decrypt 처리 or 여기서 복호화)
+        try {
+            userService.updatePasswordByEmail(encEmail, newPassword);
+        } catch (Exception e) {
+            // (선택) 실패 시 재시도 안내 혹은 신규 토큰 발급 로직
+            // 토큰은 이미 used=true 이므로 동일 토큰 재사용은 불가
+            throw new CustomException("비밀번호 변경에 실패했습니다.", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
         }
 
-        System.out.println(doc);
-
-        Timestamp expiresAt = doc.getTimestamp("expiresAt");
-        assert expiresAt != null;
-        if(expiresAt.toDate().before(new java.util.Date())){
-            System.out.println("토큰이 만료되었습니다.");
-            throw new CustomException("비밀번호 재설정 시간이 만료되었습니다. 다시 시도해주세요.", null, HttpStatus.BAD_REQUEST, null);
-        }
-
-        String email = doc.getString("email"); // 암호화된 이메일 그대로 가져오기
-        userService.updatePasswordByEmail(email, newPassword);
-        docRef.delete().get();
+        // 3) (선택) 토큰 문서 삭제 또는 상태 기입
+        firestore.collection("PasswordResetTokens").document(token).delete(); // 선택
     }
+
 
 
 }

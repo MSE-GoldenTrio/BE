@@ -355,8 +355,8 @@ public class UserController {
             return expiredHtml("만료된 링크입니다.");
         }
 
-        // 3. 유효한 경우 → used=true 로 업데이트 (일회용 보장)
-        ref.update("used", true, "usedAt", Timestamp.now());
+        // 3. 링크를 클릭한 시간 로그/마킹
+        ref.update("clickedAt", Timestamp.now());
 
         // 4. 앱 딥링크 HTML 생성
         String html = """
