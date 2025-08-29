@@ -228,6 +228,8 @@ public class UserController {
             System.out.println("비밀번호 변경 요청 이메일: " + aes.decrypt(email));
             passwordResetService.sendResetLink(email);
             return ResponseEntity.ok(Map.of("message", "이메일 전송에 성공했습니다."));
+        } catch(CustomException ce){
+            throw ce;
         } catch (Exception e) {
             System.out.println("예외 발생: " + e.getMessage());
             throw new CustomException("일시적 오류가 발생하였습니다.", e.toString(), HttpStatus.BAD_REQUEST, e);
