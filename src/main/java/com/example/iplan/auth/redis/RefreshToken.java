@@ -18,16 +18,28 @@ import java.util.concurrent.TimeUnit;
 @NoArgsConstructor
 public class RefreshToken {
     @Id
-    private String id;
+    private String id;            // 복합키: nickname:fcmtoken
+
+    private String nickname;      // 식별자(암호화된 닉네임) 별도 보관
+    private String fcmToken;      // 실제 기기 토큰(혹은 placeholder)
 
     private String refreshToken;
 
     @TimeToLive(unit = TimeUnit.MINUTES)
-    private Long expiration;
+    private Long expiration;      // 분 단위 TTL
 
-    public RefreshToken(CustomOAuth2UserDetails userDetails, String refreshToken, Long expiration){
-        this.id = userDetails.getUsername();    // 암호화 되어있는 사용자 닉네임이 식별자
+    public static String compositeKey(String nickname, String fcmToken) {
+        return nickname + ":" + (fcmToken == null ? "NULL" : fcmToken);
+    }
+
+    public RefreshToken(CustomOAuth2UserDetails userDetails,
+                        String fcmToken,
+                        String refreshToken,
+                        Long expiration){
+        this.nickname = userDetails.getUsername();     // 암호화된 닉네임
+        this.fcmToken = fcmToken;                      // 실제 또는 placeholder
         this.refreshToken = refreshToken;
         this.expiration = expiration;
+        this.id = compositeKey(this.nickname, this.fcmToken);
     }
 }
