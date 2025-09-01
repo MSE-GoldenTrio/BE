@@ -404,11 +404,8 @@ public class ScreenTimeService {
             if (timeMatcher.matches() || minutesMatcher.matches()) {
                 String time = timeMatcher.matches() ? TimeFormatter(timeMatcher) : TimeFormatter(minutesMatcher);
                 if (timeCount.get() - 1 < categories.size()) {
-                    if(categories.get(timeCount.get() - 1).get("name") != null &&
-                            !categories.get(timeCount.get() - 1).get("name").isEmpty()){
-                        categories.get(timeCount.get() - 1).put("time", time);
-                        timeCount.incrementAndGet();
-                    }
+                    categories.get(timeCount.get() - 1).put("time", time);
+                    timeCount.incrementAndGet();
                 }
             } else if (isValidAppName(text) && savedInstalledApps.contains(text)) {
                 Map<String, String> category = new HashMap<>();
