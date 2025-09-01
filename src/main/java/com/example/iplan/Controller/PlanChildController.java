@@ -135,4 +135,19 @@ public class PlanChildController {
         String childNickname = user.getUsername();
         return planChildService.SetScreenTime(screenTime, childNickname);
     }
+
+    /**
+     * 아이의 단일 계획 목록 반환
+     * -> 프론트에서 onSnapshot()으로 데이터 변경 감지 후 바뀐 계획만 가져오는것
+     */
+    @Operation(summary = "onSnapshot()으로 감지한 바뀐 계획 데이터 GET", description = "해당 사용자의 단일 계획 목록을 가져온다.")
+    @GetMapping("/changed")
+    public ResponseEntity<Map<String, Object>> getUpdatedPlan(
+            @AuthenticationPrincipal CustomOAuth2UserDetails user,
+            @RequestParam("planId") String planId) throws ExecutionException, InterruptedException {
+
+        log.info("변경된 계획 ID: {}", planId);
+        Map<String, Object> response = planChildService.getPlanById(user.getUsername(), planId);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
 }
