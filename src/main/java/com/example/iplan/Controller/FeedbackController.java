@@ -100,10 +100,20 @@ public class FeedbackController {
     // 단일 피드백 목록 반환 -> 프론트에서 onSnapshot()으로 데이터 변경 감지 후 바뀐 피드백만 가져오는것
     // 아이가 요청하는 경우만 해당
     @Operation(summary = "onSnapshot()으로 감지한 바뀐 피드백 데이터 GET", description = "단일 피드백 목록을 가져온다.")
-    @GetMapping("/feedback/changed")
-    public ResponseEntity<Map<String, Object>> getChangedFeedback(@AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam("feedbackId") String feedbackId) throws ExecutionException, InterruptedException {
+    @GetMapping("child/feedback/changed")
+    public ResponseEntity<Map<String, Object>> getChangedFeedbackByChild(@AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam("feedbackId") String feedbackId) throws ExecutionException, InterruptedException {
         String childNickname = user.getUsername();
-        log.info("변경된 피드백 ID: {}", feedbackId);
+        log.info("child 변경된 피드백 ID: {}", feedbackId);
+        Map<String, Object> response = feedbackService.getFeedbackById(childNickname, feedbackId);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    // 단일 피드백 목록 반환 -> 프론트에서 onSnapshot()으로 데이터 변경 감지 후 바뀐 피드백만 가져오는것
+    // 부모가 요청하는 경우만 해당
+    @Operation(summary = "onSnapshot()으로 감지한 바뀐 피드백 데이터 GET", description = "단일 피드백 목록을 가져온다.")
+    @GetMapping("parent/feedback/changed")
+    public ResponseEntity<Map<String, Object>> getChangedFeedbackByParent(@AuthenticationPrincipal CustomOAuth2UserDetails user, @RequestParam("feedbackId") String feedbackId, @RequestParam("childNickname") String childNickname) throws ExecutionException, InterruptedException {
+        log.info("parent 변경된 피드백 ID: {}", feedbackId);
         Map<String, Object> response = feedbackService.getFeedbackById(childNickname, feedbackId);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
