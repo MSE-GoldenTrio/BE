@@ -252,12 +252,12 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public void destroyToken(String accessToken, String reason) {
+    public void destroyToken(String accessToken, String reason, String fcmToken) {
         // 1. nickname 추출
         String nickname = getUserNickname(accessToken);
 
         // 2. Redis에서 RefreshToken 삭제
-        refreshTokenService.deleteToken(nickname);
+        refreshTokenService.deleteToken(nickname, fcmToken);
 
         // 3. accessToken 만료 시간 계산 → 현재 시간과의 차이로 TTL 계산
         Date expirationDate = getExpirationDate(accessToken);

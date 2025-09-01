@@ -204,6 +204,7 @@ public class UserService {
             long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
             refreshTokenService.saveToken(
                     (CustomOAuth2UserDetails) authentication.getPrincipal(),
+                    fcmToken,
                     jwtToken.getRefreshToken(),
                     expirationMinutes
             );
@@ -317,7 +318,7 @@ public class UserService {
         }
 
         // 제일 마지막에 ! 토큰 무효화
-        jwtTokenProvider.destroyToken(accessToken, "withdraw");
+        jwtTokenProvider.destroyToken(accessToken, "withdraw", fcmToken);
 
         return "Delete User Successfully";
     }

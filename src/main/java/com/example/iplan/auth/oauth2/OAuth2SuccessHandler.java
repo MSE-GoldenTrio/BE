@@ -34,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * OAuth2 로그인 성공 후 JWT 발급 및 React Native 앱으로 리다이렉트 처리
@@ -62,7 +63,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         boolean isNewUser = customOAuth2UserService.isNewUser();
 
         if (user == null) {
-            log.error("OAuth2 login error: No user info");
+            log.error("OAuth2 소셜로그인 Error: No user info");
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "OAuth2 로그인 중 사용자 정보가 없습니다.");
             return;
         }
@@ -104,20 +105,32 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             throw new RuntimeException(e);
         }
 
-        // Refresh 토큰 Redis 에 저장
+        // Refresh 토큰 Redis 에 저장 (소셜로그인 시점: fcmToken 미정 → placeholder 사용)
+        // 1) 세션별 placeholder 생성
+        String sessionId = UUID.randomUUID().toString();
+        String placeholderFcm = "PENDING-" + sessionId;
         long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60; // ms → minutes
+
+        // 2) placeholder FCM 으로 RefreshToken 저장 (복합키: nickname:placeholderFcm)
         refreshTokenService.saveToken(
                 (CustomOAuth2UserDetails) authentication.getPrincipal(),
+                placeholderFcm,
                 jwtToken.getRefreshToken(),
                 expirationMinutes
         );
-        log.info("Refresh 토큰 Redis 에 저장: user_id={}, ttl={}min", user.getNickname(), expirationMinutes);
+        log.info("Refresh 토큰 Redis 저장 (placeholder): user={}, fcm={}, ttl={}min",
+                user.getNickname(), placeholderFcm, expirationMinutes);
+
 
         // React Native 앱으로 리다이렉트 (딥링크 사용)
-        String redirectUrl = String.format("iplan://auth-callback?accessToken=%s&refreshToken=%s&needsAdditionalInfo=%s",
+        // 3) 딥링크에 sessionId 추가하여 FE에 전달
+        String redirectUrl = String.format(
+                "iplan://auth-callback?accessToken=%s&refreshToken=%s&needsAdditionalInfo=%s&sessionId=%s",
                 URLEncoder.encode(jwtToken.getAccessToken(), StandardCharsets.UTF_8),
                 URLEncoder.encode(jwtToken.getRefreshToken(), StandardCharsets.UTF_8),
-                isNewUser);
+                isNewUser,
+                URLEncoder.encode(sessionId, StandardCharsets.UTF_8)
+        );
 
         log.info("OAuth2 Redirect to : {}", redirectUrl);
         response.sendRedirect(redirectUrl);
