@@ -47,7 +47,10 @@ public class AuthController {
 
         String accessToken = request.getAccessToken();
         String refreshToken = request.getRefreshToken();
-        log.info("토큰 재발급 refreshToken: {}", refreshToken);
+        String fcmToken = request.getFcmToken();
+        log.info("토큰 재발급 요청 fcmToken: {}", fcmToken);
+        log.info("토큰 재발급 요청 accessToken: {}", accessToken);
+        log.info("토큰 재발급 요청 refreshToken: {}", refreshToken);
 
         // 1. accessToken 에서 암호화 되어있는!! nickname 추출
         String encryptedNickname;
@@ -60,8 +63,9 @@ public class AuthController {
                     .body(Map.of("message", "유효하지 않은 AccessToken 입니다."));
         }
 
-        // 2. Redis에서 refreshToken 조회 및 검증
-        Optional<RefreshToken> optional = refreshTokenService.getToken(encryptedNickname);
+        // 2. Redis 에서 refreshToken 조회 및 검증
+        // -> 유저 닉네임(암호화)과 기기 fcmToken 으로 조회(여러 기기에 로그인 가능하므로)
+        Optional<RefreshToken> optional = refreshTokenService.getToken(encryptedNickname, fcmToken);
       
         if (optional.isEmpty()) {
             return ResponseEntity
@@ -77,7 +81,7 @@ public class AuthController {
                     .body(Map.of("message", "RefreshToken이 일치하지 않습니다. 다시 로그인 해주세요."));
         }
 
-        // 3. DB에서 유저 정보 다시 조회 (최신 linked_id 등을 위해) 후 CustomOAuth2UserDetails 재생성
+        // 3. DB 에서 유저 정보 다시 조회 (최신 linked_id 등을 위해) 후 CustomOAuth2UserDetails 재생성
         CustomOAuth2UserDetails userDetails = userService.loadUserByEncryptedNickname(encryptedNickname);
 
         if (userDetails == null) {
@@ -105,7 +109,7 @@ public class AuthController {
             newToken = jwtTokenProvider.generateToken(authentication);
 
             long expirationMinutes = jwtProperties.getRefreshTokenExpiration() / 1000 / 60;
-            refreshTokenService.saveToken((CustomOAuth2UserDetails) authentication.getPrincipal(), newToken.getRefreshToken(), expirationMinutes);
+            refreshTokenService.saveToken((CustomOAuth2UserDetails) authentication.getPrincipal(), fcmToken, newToken.getRefreshToken(), expirationMinutes);
         } else {
 
             // 7. accessToken 은 항상 새로 발급
