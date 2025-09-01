@@ -40,7 +40,7 @@ public class ScreenTimeController {
                 ObjectMapper objectMapper = new ObjectMapper();
                 installedApps = objectMapper.readValue(installedAppsJson, new TypeReference<>() {});
             } catch (JsonProcessingException e) {
-                throw new CustomException("앱 목록 파싱 실패", e.toString(), HttpStatus.BAD_REQUEST, e);
+                throw new CustomException("앱 목록 불러오기 오류", e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
             }
         }else{
             System.out.println("앱 목록 비었거나 null임: " + installedAppsJson);

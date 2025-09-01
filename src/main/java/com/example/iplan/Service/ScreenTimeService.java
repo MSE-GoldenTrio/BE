@@ -129,7 +129,7 @@ public class ScreenTimeService {
         InstalledApps savedInstalledApps = installedAppsRepository.findByUserId(user_id);
 
         if(user_id == null){
-            throw new CustomException("로그인 상태를 확인해주세요.", "유저 아이디가 존재하지 않습니다.", HttpStatus.BAD_REQUEST, null);
+            throw new CustomException("서버 오류 발생", "유저 아이디가 존재하지 않습니다.", HttpStatus.INTERNAL_SERVER_ERROR, null);
         }
 
         if(installedApps != null){
@@ -150,7 +150,7 @@ public class ScreenTimeService {
             try {
                 // 1. 임시 파일로 저장
                 if (image == null || image.isEmpty()) {
-                    throw new CustomException("업로드된 파일이 없습니다.", null, HttpStatus.BAD_REQUEST, null);
+                    throw new CustomException("업로드된 파일이 없습니다.", null, HttpStatus.INTERNAL_SERVER_ERROR, null);
                 }
 
                 String filename = image.getOriginalFilename();
@@ -238,7 +238,7 @@ public class ScreenTimeService {
                     } catch (Exception e) {
                         DeleteFolderFiles(filePath);
                         log.error("OCR 처리 중 내부 오류 발생", e);
-                        throw new CustomException(e.getMessage(), e.toString(), HttpStatus.BAD_REQUEST, e);
+                        throw new CustomException(e.getMessage(), e.toString(), HttpStatus.INTERNAL_SERVER_ERROR, e);
                     }
                 } else {
                     DeleteFolderFiles(filePath);
@@ -382,7 +382,7 @@ public class ScreenTimeService {
 
             if(categories.isEmpty()){
                 log.info("사용자 기기에 추가되지 않은 어플이 있습니다.");
-                throw new CustomException("사진과 사용자 기기의 정보가 일치하지 않습니다. 올바른 사진을 올려주세요.", null, HttpStatus.BAD_REQUEST, null);
+                throw new CustomException("사용자 기기에 없는 어플이 있습니다.", null, HttpStatus.BAD_REQUEST, null);
             }
             result.put(KEY_CATEGORIES, categories);
             return result;
@@ -404,8 +404,11 @@ public class ScreenTimeService {
             if (timeMatcher.matches() || minutesMatcher.matches()) {
                 String time = timeMatcher.matches() ? TimeFormatter(timeMatcher) : TimeFormatter(minutesMatcher);
                 if (timeCount.get() - 1 < categories.size()) {
-                    categories.get(timeCount.get() - 1).put("time", time);
-                    timeCount.incrementAndGet();
+                    if(categories.get(timeCount.get() - 1).get("name") != null &&
+                            !categories.get(timeCount.get() - 1).get("name").isEmpty()){
+                        categories.get(timeCount.get() - 1).put("time", time);
+                        timeCount.incrementAndGet();
+                    }
                 }
             } else if (isValidAppName(text) && savedInstalledApps.contains(text)) {
                 Map<String, String> category = new HashMap<>();
