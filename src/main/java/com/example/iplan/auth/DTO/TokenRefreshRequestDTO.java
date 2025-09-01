@@ -12,4 +12,5 @@ import lombok.ToString;
 public class TokenRefreshRequestDTO {
     private String accessToken;
     private String refreshToken;
+    private String fcmToken;
 }
