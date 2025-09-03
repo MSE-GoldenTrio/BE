@@ -128,7 +128,7 @@ public class PlanChildService {
         // 1. 계획 업데이트
         PlanChild updatePlan = PlanChild.builder()
                 .id(existingPlan.getId())
-                .temp_id(existingPlan.getTemp_id())
+                .temp_id(planChildDTO.getTemp_id())
                 .user_id(user_id)
                 .hashed_user_id(existingPlan.getHashed_user_id())
                 .alarm(planChildDTO.isAlarm())
