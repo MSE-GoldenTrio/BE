@@ -26,6 +26,9 @@ public class PlanChildDTO {
     @Schema(description = "계획 데이터 고유 ID", example = "12345")
     private String id;
 
+    @Schema(description = "프론트 낙관적 업데이트와 온스냅샷 감지가 동시에 이루어짐에 따라 필요한 매칭 id", example = "temp-2198722398")
+    private String temp_id;
+
     @Schema(description = "사용자 Nickname", example = "user123")
     private String user_id;
 
