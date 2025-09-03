@@ -166,7 +166,7 @@ public class UserService {
                         userRecord = FirebaseAuth.getInstance().getUserByEmail(aes.decrypt(user.getEmail()));
                         log.info("기존 Firebase Authentication 사용자: {}", userRecord.getUid());
                     } catch (Exception e) {
-                        // 존재하지 않으면 새로 생성 (UID 자등오르 랜덤 생성됨)
+                        // 존재하지 않으면 새로 생성 (UID 자동 랜덤 생성됨)
                         UserRecord.CreateRequest createRequest = new UserRecord.CreateRequest()
                                 .setEmail(aes.decrypt(user.getEmail()))
                                 .setDisplayName(aes.decrypt(user.getName()));
@@ -183,7 +183,71 @@ public class UserService {
                     log.error("Firebase 사용자 생성 중 오류", e);
                     throw new CustomException("Firebase 사용자 생성 중 오류", e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, e);
                 }
+            } else {
+                // UID가 이미 있는 경우: 해당 UID의 이메일을 보정(업데이트)
+                try {
+                    final String uid   = user.getFirebaseAuthUID();
+                    final String email = aes.decrypt(user.getEmail());
+                    final String name  = aes.decrypt(user.getName());
+
+                    UserRecord existing = FirebaseAuth.getInstance().getUser(uid);
+
+                    boolean needUpdate = false;
+                    UserRecord.UpdateRequest updateReq = new UserRecord.UpdateRequest(uid);
+
+                    // 이메일이 비어있거나 다르면 업데이트 (주의: 이미 다른 계정이 쓰는 이메일이면 실패)
+                    if (email != null && !email.isBlank()
+                            && (existing.getEmail() == null || !existing.getEmail().equalsIgnoreCase(email))) {
+                        updateReq.setEmail(email);
+                        needUpdate = true;
+                    }
+
+                    // DisplayName 보정
+                    if (name != null && !name.isBlank()
+                            && (existing.getDisplayName() == null || !existing.getDisplayName().equals(name))) {
+                        updateReq.setDisplayName(name);
+                        needUpdate = true;
+                    }
+
+                    if (needUpdate) {
+                        try {
+                            FirebaseAuth.getInstance().updateUser(updateReq);
+                            log.info("Firebase 사용자 메타데이터 보정 완료: uid={}, email={}, name={}", uid, email, name);
+                        } catch (com.google.firebase.auth.FirebaseAuthException emailErr) {
+                            // 이메일 충돌 등으로 실패하는 경우, 이름만이라도 별도로 갱신 시도
+                            log.warn("이메일 업데이트 실패(충돌 가능). 이름만 업데이트 시도: uid={}, cause={}", uid, emailErr.getMessage());
+                            if (name != null && !name.isBlank()
+                                    && (existing.getDisplayName() == null || !existing.getDisplayName().equals(name))) {
+                                try {
+                                    FirebaseAuth.getInstance().updateUser(new UserRecord.UpdateRequest(uid).setDisplayName(name));
+                                    log.info("DisplayName만 보정 완료: uid={}, name={}", uid, name);
+                                } catch (Exception nameOnlyErr) {
+                                    log.error("DisplayName 보정 실패: uid={}, err={}", uid, nameOnlyErr.getMessage(), nameOnlyErr);
+                                }
+                            }
+                        }
+                    } else {
+                        log.info("Firebase 메타데이터 보정 불필요: uid={}", uid);
+                    }
+
+                } catch (com.google.firebase.auth.FirebaseAuthException notFound) {
+                    // uid로 사용자를 못 찾는 이례 케이스: 같은 uid로 재생성 시도
+                    log.warn("UID로 Firebase 사용자를 찾지 못함. 동일 UID로 생성 시도: cause={}", notFound.getMessage());
+                    try {
+                        UserRecord.CreateRequest req = new UserRecord.CreateRequest()
+                                .setUid(user.getFirebaseAuthUID())
+                                .setEmail(aes.decrypt(user.getEmail()))
+                                .setDisplayName(aes.decrypt(user.getName()));
+                        FirebaseAuth.getInstance().createUser(req);
+                        log.info("누락된 Firebase 사용자 재생성 완료: uid={}", user.getFirebaseAuthUID());
+                    } catch (Exception createErr) {
+                        log.error("누락된 Firebase 사용자 재생성 실패: {}", createErr.getMessage(), createErr);
+                    }
+                } catch (Exception e) {
+                    log.error("Firebase 사용자 메타데이터 보정 중 오류: {}", e.getMessage(), e);
+                }
             }
+
 
             // 6. UID 포함한 사용자 정보로 Authentication 객체 다시 생성
             CustomOAuth2UserDetails updatedUserDetails = new CustomOAuth2UserDetails(user);
