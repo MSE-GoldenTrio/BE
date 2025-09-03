@@ -58,6 +58,7 @@ public class PlanChildService {
 
         // 계획 포스트에 해시된 유저 아이디 필드 추가
         PlanChild planPost = PlanChild.builder()
+                .temp_id(planPostDto.getTemp_id())
                 .user_id(user_id)
                 .hashed_user_id(hashedNickname)
                 .alarm(planPostDto.isAlarm())
@@ -127,6 +128,7 @@ public class PlanChildService {
         // 1. 계획 업데이트
         PlanChild updatePlan = PlanChild.builder()
                 .id(existingPlan.getId())
+                .temp_id(existingPlan.getTemp_id())
                 .user_id(user_id)
                 .hashed_user_id(existingPlan.getHashed_user_id())
                 .alarm(planChildDTO.isAlarm())

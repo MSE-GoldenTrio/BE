@@ -24,6 +24,13 @@ public class PlanChild {
     @Schema(description = "계획 데이터 고유 ID", example = "12345")
     private String id; // Firestore 문서의 ID
 
+
+    // 서버에 계획이 저장되는 순간 온스냅샷이 실행되는데
+    // 만약 온스냅샷이 먼저 실행된다면 프론트에서 낙관전 업데이트를 위해 발급한 tempId가 치환이 되지 않을 수 있음
+    // -> tempId를 서버에도 같이 보내어 저장 후, 온스냅샷 감지 이후 단일 계획 반환 시에 tempId도 같이 반환하여 계획 필터링 하도록 함
+    @Schema(description = "프론트 낙관적 업데이트와 온스냅샷 감지가 동시에 이루어짐에 따라 필요한 매칭 id", example = "temp-2198722398")
+    private String temp_id;
+
     @NotNull
     @Schema(description = "사용자 닉네임", example = "user123")
     private String user_id;
