@@ -44,6 +44,7 @@ public class RewardChildService {
         // 빌더 패턴을 사용하여 RewardChild 객체 생성
         RewardChild reward = RewardChild.builder()
                 .user_id(nickname)
+                .temp_id(rewardDto.getTemp_id())
                 .content(aes.encrypt(rewardDto.getContent()))
                 .post_date(rewardDto.getPost_date())
                 .post_year(rewardDto.getPost_year())
@@ -117,6 +118,7 @@ public class RewardChildService {
         return RewardChildDTO.builder()
                 .id(rewardChild.getId())
                 .user_id(aes.decrypt(rewardChild.getUser_id()))
+                .temp_id(rewardChild.getTemp_id())
                 .content(aes.decrypt(rewardChild.getContent()))
                 .post_date(rewardChild.getPost_date())
                 .post_year(rewardChild.getPost_year())
@@ -244,6 +246,7 @@ public class RewardChildService {
 
         RewardChild updatedReward = RewardChild.builder()
                 .id(existingReward.getId())
+                .temp_id(rewardDto.getTemp_id())
                 .user_id(rewardDto.getUser_id() != null ? rewardDto.getUser_id() : existingReward.getUser_id())
                 .content(rewardDto.getContent() != null ? aes.encrypt(rewardDto.getContent()) : existingReward.getContent())
                 .post_date(rewardDto.getPost_date() != null ? rewardDto.getPost_date() : existingReward.getPost_date())

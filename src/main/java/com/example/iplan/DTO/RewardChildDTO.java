@@ -15,10 +15,16 @@ import lombok.*;
 @JsonInclude(JsonInclude.Include.NON_NULL)  // 불필요한 null 값을 제거할 수 있도록 수정 -> 프론트엔드에서 불필요한 데이터 관리 필요 없음
 public class RewardChildDTO {
 
+    @Schema(description = "계획 데이터 고유 ID", example = "12345")
     private String id; // Firestore 문서의 ID
 
+    @Schema(description = "프론트 낙관적 업데이트와 온스냅샷 감지가 동시에 이루어짐에 따라 필요한 매칭 id", example = "temp-2198722398")
+    private String temp_id;
+
+    @Schema(description = "아이의 고유 Nickname", example = "user123")
     private String user_id; // 아이의 고유 닉네임
 
+    @Schema(description = "보상의 내용", example = "user123")
     private String content; // 보상의 내용
 
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
@@ -32,8 +38,6 @@ public class RewardChildDTO {
 
     @JsonFormat(pattern = "dd")
     private String post_day;
-
-    private String plan_id; // 보상을 지급할 plan
 
     private boolean rewarded; // 보상이 지급되었는지 여부
 

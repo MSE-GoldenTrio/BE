@@ -114,6 +114,7 @@ public class RewardChildRepository extends DefaultFirebaseDBRepository<RewardChi
     private RewardChildDTO convertToDTO(RewardChild rewardChild) {
         return RewardChildDTO.builder()
                 .id(rewardChild.getId())
+                .temp_id(rewardChild.getTemp_id())
                 .user_id(rewardChild.getUser_id())
                 .content(rewardChild.getContent())
                 .post_date(rewardChild.getPost_date())
